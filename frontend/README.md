@@ -1,77 +1,119 @@
-# AI股票助理
+# AI 股票助手前端
 
-AI股票助理是一个现代化的Web应用，使用AI技术分析股票市场，提供实时数据、图表和智能投资建议，帮助用户做出更明智的投资决策。
+AI 股票助手的前端界面，使用 React、TypeScript 和 Ant Design 构建。
 
 ## 功能特点
 
-- 🔍 **股票搜索**：快速搜索全球股票市场的股票
-- 📊 **实时数据**：查看股票的实时价格、涨跌幅等基本信息
-- 📈 **价格图表**：查看不同时间范围的股票价格走势图
-- 🤖 **AI分析**：获取基于AI的股票分析、情绪评估和投资建议
-- 📚 **收藏管理**：保存感兴趣的股票，添加个人笔记
-- 🌙 **深色模式**：支持浅色/深色模式，保护您的眼睛
+- 股票搜索和详情展示
+- 交互式股票图表
+- 技术指标可视化
+- AI 分析结果展示
+- 用户投资组合管理
 
 ## 技术栈
 
-- **前端框架**：Next.js 15 + React 19
-- **样式**：Tailwind CSS
-- **图表**：Recharts
-- **状态管理**：React Hooks
-- **HTTP请求**：Axios
-- **UI组件**：自定义组件库
+- **React**: UI 库
+- **TypeScript**: 类型安全的 JavaScript
+- **Ant Design**: UI 组件库
+- **ECharts**: 图表库
+- **Redux Toolkit**: 状态管理
+- **React Router**: 路由管理
+- **Axios**: HTTP 客户端
 
-## 开始使用
+## 开发环境设置
 
-### 安装依赖
+### 前提条件
 
+- Node.js 14.x 或更高版本
+- npm 6.x 或更高版本
+
+### 安装步骤
+
+1. 克隆仓库
+```bash
+git clone https://github.com/yourusername/ai-stock-assistant.git
+cd ai-stock-assistant/frontend
+```
+
+2. 安装依赖
 ```bash
 npm install
 ```
 
-### 开发模式
-
+3. 启动开发服务器
 ```bash
-npm run dev
+npm start
 ```
 
-### 构建生产版本
+应用将在 http://localhost:3000 上运行。
+
+## 项目结构
+
+```
+frontend/
+├── public/              # 静态资源
+├── src/                 # 源代码
+│   ├── api/             # API 请求
+│   ├── components/      # 可复用组件
+│   ├── pages/           # 页面组件
+│   ├── store/           # Redux 状态管理
+│   ├── types/           # TypeScript 类型定义
+│   ├── utils/           # 工具函数
+│   ├── App.tsx          # 应用入口组件
+│   └── index.tsx        # 应用入口点
+├── .env                 # 环境变量
+├── package.json         # 项目依赖
+├── tsconfig.json        # TypeScript 配置
+└── README.md            # 项目说明
+```
+
+## 构建生产版本
 
 ```bash
 npm run build
 ```
 
-### 启动生产服务器
+构建产物将生成在 `build` 目录中。
+
+## Docker 部署
+
+使用 Docker 构建和运行前端：
 
 ```bash
-npm run start
+# 构建镜像
+docker build -t ai-stock-assistant-frontend .
+
+# 运行容器
+docker run -p 3000:80 ai-stock-assistant-frontend
 ```
 
-## 项目结构
+## 开发指南
 
+### 添加新页面
+
+1. 在 `src/pages` 目录下创建新页面组件
+2. 在 `src/App.tsx` 中添加路由
+
+### 添加新组件
+
+1. 在 `src/components` 目录下创建新组件
+2. 导出组件并在需要的地方导入使用
+
+### 添加新 API 请求
+
+1. 在 `src/api` 目录下添加新的 API 请求函数
+2. 使用 Axios 发送请求并处理响应
+
+## 测试
+
+```bash
+# 运行单元测试
+npm test
+
+# 运行端到端测试
+npm run test:e2e
 ```
-src/
-├── app/                # Next.js应用目录
-│   ├── api/            # API路由
-│   ├── globals.css     # 全局样式
-│   ├── layout.tsx      # 布局组件
-│   └── page.tsx        # 主页面
-├── components/         # React组件
-│   ├── ui/             # UI组件
-│   ├── StockSearch.tsx # 股票搜索组件
-│   ├── StockDetail.tsx # 股票详情组件
-│   ├── StockChart.tsx  # 股票图表组件
-│   ├── AIAnalysis.tsx  # AI分析组件
-│   └── SavedStocks.tsx # 收藏股票组件
-├── lib/                # 工具函数和服务
-│   └── api.ts          # API服务
-└── types/              # TypeScript类型定义
-    └── index.ts        # 类型定义
-```
 
-## 免责声明
+## 贡献指南
 
-本应用提供的数据和分析仅供参考，不构成投资建议。投资决策请结合个人风险承受能力和专业意见。
-
-## 许可证
-
-MIT
+请参阅项目根目录的 [贡献指南](../README.md#贡献指南)。

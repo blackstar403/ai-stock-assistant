@@ -45,7 +45,40 @@ AI 股票助手是一个全栈应用程序，由后端 API 和前端界面组成
 
 ## 快速开始
 
-### 后端
+### 方法一：使用 Docker（推荐）
+
+项目提供了 Docker Compose 配置和一键部署脚本，可以快速部署整个应用。
+
+#### 前提条件
+
+- Docker 和 Docker Compose 已安装
+
+#### 部署步骤
+
+1. 克隆仓库
+```bash
+git clone https://github.com/yourusername/ai-stock-assistant.git
+cd ai-stock-assistant
+```
+
+2. 运行部署脚本
+```bash
+./deploy.sh
+```
+
+部署脚本会自动执行以下操作：
+- 检查环境配置
+- 训练机器学习模型（如果需要）
+- 构建并启动服务
+- 显示访问地址
+
+3. 访问应用
+- 后端 API 文档：http://localhost:8000/api/docs
+- 前端界面：http://localhost:3000
+
+### 方法二：手动安装
+
+#### 后端
 
 ```bash
 cd backend
@@ -55,7 +88,7 @@ python train_model.py  # 可选，训练机器学习模型
 uvicorn app.main:app --reload
 ```
 
-### 前端
+#### 前端
 
 ```bash
 cd frontend
@@ -67,6 +100,49 @@ npm start
 
 - [后端 API 文档](backend/README.md)
 - [前端开发文档](frontend/README.md)
+- [开发计划](TODO.md)
+
+## Docker 部署详情
+
+项目使用 Docker Compose 进行容器编排，包含以下服务：
+
+- **backend**: 后端 API 服务
+  - 构建自 `./backend/Dockerfile`
+  - 暴露端口 8000
+  - 挂载卷以持久化数据和模型
+
+- **frontend**: 前端 Web 界面
+  - 构建自 `./frontend/Dockerfile`
+  - 暴露端口 3000
+  - 使用 Nginx 提供静态文件服务
+
+### 手动部署 Docker
+
+如果不使用部署脚本，也可以手动执行以下命令：
+
+```bash
+# 构建服务
+docker-compose build
+
+# 启动服务
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f
+
+# 停止服务
+docker-compose down
+```
+
+### 自定义配置
+
+可以通过修改以下文件自定义部署配置：
+
+- `docker-compose.yml`: 修改端口映射、卷挂载等
+- `backend/.env`: 配置后端环境变量
+- `backend/Dockerfile`: 自定义后端构建过程
+- `frontend/Dockerfile`: 自定义前端构建过程
+- `frontend/nginx.conf`: 自定义 Nginx 配置
 
 ## 后续开发计划 (TODO)
 
@@ -106,7 +182,8 @@ npm start
 
 ### 部署和运维
 
-- [ ] 配置 Docker 和 Docker Compose
+- [x] 配置 Docker 和 Docker Compose
+- [x] 创建一键部署脚本
 - [ ] 设置 CI/CD 流程
 - [ ] 实现自动化测试
 - [ ] 配置监控和日志系统

@@ -117,10 +117,14 @@
 
 ### 阶段一：基础设置
 
-- [ ] **P1** 配置 Docker 和 Docker Compose
-  - [ ] 创建 Dockerfile
-  - [ ] 设置 Docker Compose
-  - [ ] 优化容器配置
+- [x] **P1** 配置 Docker 和 Docker Compose
+  - [x] 创建 Dockerfile
+  - [x] 设置 Docker Compose
+  - [x] 优化容器配置
+- [x] **P1** 创建一键部署脚本
+  - [x] 实现环境检查
+  - [x] 添加模型训练支持
+  - [x] 自动化部署流程
 - [ ] **P1** 设置 CI/CD 流程
   - [ ] 配置 GitHub Actions
   - [ ] 实现自动测试
