@@ -1,6 +1,6 @@
-# AI 股票助手后端 API
+# 后端
 
-这是 AI 股票助手的后端 API 服务，使用 Python FastAPI 构建。
+后端 API 服务，使用 Python FastAPI 构建。
 
 ## 功能特点
 
