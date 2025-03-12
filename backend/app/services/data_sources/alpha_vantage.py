@@ -222,16 +222,84 @@ class AlphaVantageDataSource(DataSourceBase):
     async def get_news_sentiment(self, symbol: str) -> Dict[str, Any]:
         """获取新闻情绪分析"""
         try:
-            # 调用 Alpha Vantage API
+            # 构建 API URL
+            url = f"{self.base_url}/NEWS_SENTIMENT"
             params = {
                 "function": "NEWS_SENTIMENT",
                 "tickers": symbol,
                 "apikey": self.api_key
             }
-            response = requests.get(self.base_url, params=params)
-            data = response.json()
             
-            return data
+            # 发送请求
+            response = await self._make_request(url, params)
+            
+            if not response or "feed" not in response:
+                return {}
+            
+            # 提取情绪分数
+            sentiment_scores = []
+            for article in response["feed"]:
+                if "ticker_sentiment" in article:
+                    for ticker_sentiment in article["ticker_sentiment"]:
+                        if ticker_sentiment["ticker"] == symbol:
+                            sentiment_scores.append(float(ticker_sentiment["ticker_sentiment_score"]))
+            
+            # 计算平均情绪分数
+            avg_sentiment = sum(sentiment_scores) / len(sentiment_scores) if sentiment_scores else 0
+            
+            return {
+                "feed": response["feed"],
+                "sentiment_score_avg": avg_sentiment
+            }
         except Exception as e:
             print(f"获取新闻情绪时出错: {str(e)}")
-            return {} 
+            return {}
+    
+    async def get_sector_linkage(self, symbol: str) -> Dict[str, Any]:
+        """获取板块联动性分析"""
+        # Alpha Vantage 没有直接提供板块联动性分析的 API
+        # 返回默认值
+        try:
+            # 尝试获取股票所属行业
+            sector_name = "未知板块"
+            
+            # 获取公司概览
+            url = f"{self.base_url}/OVERVIEW"
+            params = {
+                "function": "OVERVIEW",
+                "symbol": symbol,
+                "apikey": self.api_key
+            }
+            
+            response = await self._make_request(url, params)
+            
+            if response and "Sector" in response:
+                sector_name = response["Sector"]
+            
+            return {
+                "sector_name": sector_name,
+                "correlation": 0.5,  # 默认中等相关性
+                "driving_force": 0.3,  # 默认较低带动性
+                "rank_in_sector": 0,
+                "total_in_sector": 0
+            }
+        except Exception as e:
+            print(f"获取板块联动性时出错: {str(e)}")
+            return {
+                "sector_name": "未知板块",
+                "correlation": 0.5,
+                "driving_force": 0.3,
+                "rank_in_sector": 0,
+                "total_in_sector": 0
+            }
+    
+    async def get_concept_distribution(self, symbol: str) -> Dict[str, Any]:
+        """获取概念涨跌分布分析"""
+        # Alpha Vantage 没有直接提供概念涨跌分布分析的 API
+        # 返回默认值
+        return {
+            "overall_strength": 0.5,  # 默认中等强度
+            "leading_concepts": [],
+            "lagging_concepts": [],
+            "all_concepts": []
+        } 

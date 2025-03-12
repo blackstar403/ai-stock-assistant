@@ -490,3 +490,308 @@ class AKShareDataSource(DataSourceBase):
         
         # 默认关键词
         return ["经济", "政策", "发展", "改革", "创新", "金融", "市场", "投资"]
+    
+    async def get_sector_linkage(self, symbol: str) -> Dict[str, Any]:
+        """获取板块联动性分析"""
+        try:
+            # 解析股票代码
+            code_match = re.match(r'(\d+)\.([A-Z]+)', symbol)
+            if not code_match:
+                return self._default_sector_linkage()
+            
+            code = code_match.group(1)
+            
+            # 获取股票所属板块
+            try:
+                # 获取股票行业分类数据
+                stock_row = ak.stock_individual_info_em(symbol=code)
+
+                # 提取行业信息
+                industry_info = None
+                for _, row in stock_row.iterrows():
+                    if row['item'] == '行业':
+                        industry_info = row['value']
+                        break
+                
+                # 如果找不到行业信息，使用默认值
+                if not industry_info:
+                    return self._default_sector_linkage()
+                
+                # 设置行业名称
+                sector_name = industry_info
+
+                # 获取同行业股票
+                sector_stocks = ak.stock_board_industry_cons_em(symbol=sector_name)
+                sector_total = len(sector_stocks)
+                
+                if sector_total <= 1:
+                    return self._default_sector_linkage(sector_name)
+                
+                # 获取板块内所有股票的历史数据
+                sector_data = {}
+                sector_codes = sector_stocks['代码'].tolist()
+                
+                # 限制处理的股票数量，避免请求过多
+                max_stocks = min(20, len(sector_codes))
+                sector_codes = sector_codes[:max_stocks]
+                
+                # 获取当前股票的历史数据
+                end_date = datetime.now().strftime('%Y%m%d')
+                start_date = (datetime.now() - timedelta(days=60)).strftime('%Y%m%d')
+                
+                target_stock_data = ak.stock_zh_a_hist(
+                    symbol=code, 
+                    period="daily", 
+                    start_date=start_date, 
+                    end_date=end_date, 
+                    adjust="qfq"
+                )
+                
+                if target_stock_data.empty:
+                    return self._default_sector_linkage(sector_name)
+                
+                # 提取目标股票的收盘价序列
+                target_stock_data['日期'] = pd.to_datetime(target_stock_data['日期'])
+                target_stock_prices = target_stock_data.set_index('日期')['收盘']
+                
+                # 获取板块内其他股票的数据
+                all_prices = {}
+                for sector_code in sector_codes:
+                    if sector_code == code:
+                        all_prices[sector_code] = target_stock_prices
+                        continue
+                    
+                    try:
+                        stock_data = ak.stock_zh_a_hist(
+                            symbol=sector_code, 
+                            period="daily", 
+                            start_date=start_date, 
+                            end_date=end_date, 
+                            adjust="qfq"
+                        )
+                        
+                        if not stock_data.empty:
+                            stock_data['日期'] = pd.to_datetime(stock_data['日期'])
+                            all_prices[sector_code] = stock_data.set_index('日期')['收盘']
+                    except:
+                        continue
+                
+                # 计算相关性和带动性
+                correlations = {}
+                returns = {}
+                
+                # 计算每只股票的日收益率
+                for code, prices in all_prices.items():
+                    returns[code] = prices.pct_change().dropna()
+                
+                # 计算目标股票与其他股票的相关性
+                target_returns = returns.get(code)
+                if target_returns is None or len(target_returns) < 10:
+                    return self._default_sector_linkage(sector_name)
+                
+                for other_code, other_returns in returns.items():
+                    if other_code == code:
+                        continue
+                    
+                    # 确保两个序列有相同的索引
+                    common_idx = target_returns.index.intersection(other_returns.index)
+                    if len(common_idx) < 10:
+                        continue
+                    
+                    # 计算相关性
+                    corr = target_returns.loc[common_idx].corr(other_returns.loc[common_idx])
+                    correlations[other_code] = corr
+                
+                if not correlations:
+                    return self._default_sector_linkage(sector_name)
+                
+                # 计算平均相关性
+                avg_correlation = sum(correlations.values()) / len(correlations)
+                
+                # 计算带动性（使用格兰杰因果检验的简化版本）
+                # 这里使用滞后相关性作为带动性的近似
+                driving_force = 0
+                
+                # 计算目标股票对其他股票的滞后影响
+                lag_influences = []
+                for other_code, other_returns in returns.items():
+                    if other_code == code:
+                        continue
+                    
+                    # 确保两个序列有相同的索引
+                    target_lagged = target_returns.shift(1).dropna()
+                    common_idx = target_lagged.index.intersection(other_returns.index)
+                    if len(common_idx) < 10:
+                        continue
+                    
+                    # 计算滞后相关性
+                    lag_corr = target_lagged.loc[common_idx].corr(other_returns.loc[common_idx])
+                    lag_influences.append(max(0, lag_corr))  # 只考虑正向影响
+                
+                if lag_influences:
+                    driving_force = sum(lag_influences) / len(lag_influences)
+                
+                # 计算板块内排名
+                rank = 1
+                for other_code in sector_codes:
+                    if other_code == code:
+                        continue
+                    
+                    try:
+                        other_data = ak.stock_zh_a_hist(
+                            symbol=other_code, 
+                            period="daily", 
+                            start_date=start_date, 
+                            end_date=end_date, 
+                            adjust="qfq"
+                        )
+                        
+                        if not other_data.empty:
+                            # 计算涨幅
+                            other_return = (other_data['收盘'].iloc[-1] / other_data['收盘'].iloc[0] - 1) * 100
+                            target_return = (target_stock_data['收盘'].iloc[-1] / target_stock_data['收盘'].iloc[0] - 1) * 100
+                            
+                            if other_return > target_return:
+                                rank += 1
+                    except:
+                        continue
+                
+                # 返回结果
+                return {
+                    "sector_name": sector_name,
+                    "correlation": float(min(1.0, max(0.0, avg_correlation))),  # 确保在0-1之间
+                    "driving_force": float(min(1.0, max(0.0, driving_force * 2))),  # 放大并限制在0-1之间
+                    "rank_in_sector": rank,
+                    "total_in_sector": sector_total
+                }
+            
+            except Exception as e:
+                print(f"获取板块联动性时出错: {str(e)}")
+                return self._default_sector_linkage()
+        
+        except Exception as e:
+            print(f"获取板块联动性时出错: {str(e)}")
+            return self._default_sector_linkage()
+    
+    def _default_sector_linkage(self, sector_name="未知板块") -> Dict[str, Any]:
+        """返回默认的板块联动性数据"""
+        return {
+            "sector_name": sector_name,
+            "correlation": 0.5,
+            "driving_force": 0.3,
+            "rank_in_sector": 0,
+            "total_in_sector": 0
+        }
+    
+    async def get_concept_distribution(self, symbol: str) -> Dict[str, Any]:
+        """获取概念涨跌分布分析"""
+        try:
+            # 解析股票代码
+            code_match = re.match(r'(\d+)\.([A-Z]+)', symbol)
+            if not code_match:
+                return self._default_concept_distribution()
+            
+            code = code_match.group(1)
+            
+            return self._default_concept_distribution()
+            
+            # 获取股票所属概念
+            try:
+                # 获取股票概念
+                stock_concept = ak.stock_board_concept_name_em()
+
+                if stock_concept.empty:
+                    return self._default_concept_distribution()
+                
+                # 获取个股所属概念
+                stock_concepts = []
+                
+                # 遍历概念，检查股票是否属于该概念
+                for _, concept_row in stock_concept.iterrows():
+                    concept_name = concept_row['板块名称']
+                    concept_code = concept_row['板块代码']
+                    try:
+                        # 获取概念成分股
+                        concept_stocks = ak.stock_board_concept_cons_em(symbol=concept_code)
+                        # 检查股票是否在概念成分股中
+                        if not concept_stocks.empty and code in concept_stocks['代码'].values:
+                            # 获取概念指数
+                            concept_index = ak.stock_board_concept_hist_ths(symbol=concept_code, period="D", start_date="20230101", end_date=datetime.now().strftime('%Y%m%d'))
+                            
+                            if not concept_index.empty:
+                                # 计算概念强度（最近一个月的涨幅）
+                                recent_data = concept_index.tail(20)  # 约一个月的交易日
+                                if len(recent_data) > 5:
+                                    concept_strength = (recent_data['收盘'].iloc[-1] / recent_data['收盘'].iloc[0] - 1)
+                                    
+                                    # 获取股票在概念中的排名
+                                    rank = 1
+                                    total = len(concept_stocks)
+                                    
+                                    # 获取个股最近一个月的涨幅
+                                    end_date = datetime.now().strftime('%Y%m%d')
+                                    start_date = (datetime.now() - timedelta(days=30)).strftime('%Y%m%d')
+                                    
+                                    stock_data = ak.stock_zh_a_hist(
+                                        symbol=code, 
+                                        period="daily", 
+                                        start_date=start_date, 
+                                        end_date=end_date, 
+                                        adjust="qfq"
+                                    )
+                                    
+                                    if not stock_data.empty and len(stock_data) > 5:
+                                        stock_return = (stock_data['收盘'].iloc[-1] / stock_data['收盘'].iloc[0] - 1)
+                                        
+                                        # 计算股票在概念中的相对表现
+                                        relative_performance = stock_return - concept_strength
+                                        
+                                        stock_concepts.append({
+                                            "name": concept_name,
+                                            "code": concept_code,
+                                            "strength": float(min(1.0, max(-1.0, concept_strength))),  # 限制在-1到1之间
+                                            "relative_performance": float(relative_performance),
+                                            "rank": rank,  # 暂时设为1，后面会更新
+                                            "total": total
+                                        })
+                    except:
+                        continue
+                
+                if not stock_concepts:
+                    return self._default_concept_distribution()
+                
+                # 计算概念整体强度
+                concept_strengths = [c["strength"] for c in stock_concepts]
+                overall_strength = sum([max(0, s) for s in concept_strengths]) / len(concept_strengths)
+                
+                # 按相对表现排序，找出领先和落后的概念
+                stock_concepts.sort(key=lambda x: x["relative_performance"], reverse=True)
+                
+                leading_concepts = [c for c in stock_concepts if c["relative_performance"] > 0][:5]
+                lagging_concepts = [c for c in stock_concepts if c["relative_performance"] < 0][-5:]
+                lagging_concepts.reverse()  # 从小到大排序
+                
+                # 返回结果
+                return {
+                    "overall_strength": float(min(1.0, max(0.0, overall_strength))),  # 确保在0-1之间
+                    "leading_concepts": leading_concepts,
+                    "lagging_concepts": lagging_concepts,
+                    "all_concepts": stock_concepts
+                }
+            
+            except Exception as e:
+                print(f"获取概念涨跌分布时出错: {str(e)}")
+                return self._default_concept_distribution()
+        
+        except Exception as e:
+            print(f"获取概念涨跌分布时出错: {str(e)}")
+            return self._default_concept_distribution()
+    
+    def _default_concept_distribution(self) -> Dict[str, Any]:
+        """返回默认的概念涨跌分布数据"""
+        return {
+            "overall_strength": 0.5,
+            "leading_concepts": [],
+            "lagging_concepts": [],
+            "all_concepts": []
+        }

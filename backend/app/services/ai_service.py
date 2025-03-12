@@ -73,6 +73,10 @@ class AIService:
             # 获取新闻情绪
             news_sentiment = await ds.get_news_sentiment(symbol)
             
+            # 获取板块联动性和概念涨跌分布
+            sector_linkage = await ds.get_sector_linkage(symbol)
+            concept_distribution = await ds.get_concept_distribution(symbol)
+            
             # 计算技术指标
             technical_indicators = AIService._calculate_technical_indicators(historical_data)
             
@@ -87,6 +91,8 @@ class AIService:
                 historical_data, 
                 fundamentals, 
                 news_sentiment,
+                sector_linkage,
+                concept_distribution,
                 technical_indicators
             )
             
@@ -102,6 +108,8 @@ class AIService:
         historical_data: pd.DataFrame,
         fundamentals: Dict[str, Any],
         news_sentiment: Dict[str, Any],
+        sector_linkage: Dict[str, Any],
+        concept_distribution: Dict[str, Any],
         technical_indicators: Dict[str, float]
     ) -> AIAnalysis:
         """使用规则计算分析股票"""
@@ -154,6 +162,50 @@ class AIService:
             key_points.append(f"布林带宽度较大({technical_indicators['BB_Width']:.2f})，表明市场波动性高")
         elif technical_indicators['BB_Width'] < 0.05:
             key_points.append(f"布林带宽度较小({technical_indicators['BB_Width']:.2f})，表明市场波动性低，可能即将突破")
+        
+        # 板块联动性分析
+        sector_driving_force = sector_linkage.get('driving_force', 0)
+        sector_correlation = sector_linkage.get('correlation', 0)
+        sector_name = sector_linkage.get('sector_name', '未知板块')
+        sector_rank = sector_linkage.get('rank_in_sector', 0)
+        sector_total = sector_linkage.get('total_in_sector', 0)
+        
+        # 板块地位分析
+        if sector_driving_force > 0.7:
+            key_points.append(f"该股在{sector_name}板块中具有较强带动性(驱动力:{sector_driving_force:.2f})，为板块龙头股")
+            if sector_rank <= 3 and sector_total > 0:
+                key_points.append(f"在{sector_name}板块中排名第{sector_rank}/{sector_total}，处于领先地位")
+        elif sector_driving_force > 0.4:
+            key_points.append(f"该股在{sector_name}板块中具有一定带动性(驱动力:{sector_driving_force:.2f})，为板块重要成员")
+        else:
+            key_points.append(f"该股在{sector_name}板块中带动性较弱(驱动力:{sector_driving_force:.2f})，主要跟随板块整体走势")
+        
+        # 板块联动性分析
+        if sector_correlation > 0.8:
+            key_points.append(f"与{sector_name}板块联动性极强(相关性:{sector_correlation:.2f})，高度同步波动")
+        elif sector_correlation > 0.5:
+            key_points.append(f"与{sector_name}板块联动性较强(相关性:{sector_correlation:.2f})，整体同步波动")
+        else:
+            key_points.append(f"与{sector_name}板块联动性较弱(相关性:{sector_correlation:.2f})，存在独立行情可能")
+        
+        # 概念涨跌分布分析
+        concept_strength = concept_distribution.get('overall_strength', 0)
+        leading_concepts = concept_distribution.get('leading_concepts', [])
+        lagging_concepts = concept_distribution.get('lagging_concepts', [])
+        
+        # 概念强度分析
+        if concept_strength > 0.7:
+            key_points.append(f"所属概念整体强势(强度:{concept_strength:.2f})，概念板块支撑较强")
+            if leading_concepts:
+                concepts_str = '、'.join([c.get('name', '') for c in leading_concepts[:2]])
+                key_points.append(f"在{concepts_str}等概念中表现活跃，具有较强主动性")
+        elif concept_strength > 0.4:
+            key_points.append(f"所属概念中性偏强(强度:{concept_strength:.2f})，概念板块支撑一般")
+        else:
+            key_points.append(f"所属概念整体弱势(强度:{concept_strength:.2f})，概念板块支撑较弱")
+            if lagging_concepts:
+                concepts_str = '、'.join([c.get('name', '') for c in lagging_concepts[:2]])
+                key_points.append(f"在{concepts_str}等概念中表现落后，缺乏主动性")
         
         # 技术指标关键点
         if current_price > technical_indicators['SMA_50']:
@@ -227,6 +279,16 @@ class AIService:
                 if risk_level == "low":
                     risk_level = "medium"
         
+        # 板块联动性风险调整
+        if sector_driving_force > 0.6:
+            # 高带动性股票风险可能更高，因为波动更大
+            if risk_level == "low":
+                risk_level = "medium"
+        elif sector_correlation > 0.8 and concept_strength < 0.3:
+            # 高联动性但概念弱势，风险可能更高
+            if risk_level == "low":
+                risk_level = "medium"
+        
         # 生成建议（根据《专业投机原理》的趋势跟踪和反转策略）
         # 综合考虑200日均线（长期趋势）、布林带位置（短期超买超卖）和RSI
         
@@ -244,42 +306,74 @@ class AIService:
         # 政策因素
         policy_bullish = policy_coefficient > 0.5
         
+        # 板块和概念因素
+        sector_bullish = sector_driving_force > 0.5 or (sector_correlation > 0.7 and concept_strength > 0.6)
+        
         # 综合建议
         if long_term_bullish:
             # 长期上升趋势
             if overbought:
-                if policy_bullish:
-                    recommendation = "持有观望。价格处于长期上升趋势，虽短期可能超买，但政策共振较强，根据《专业投机原理》，可继续持有并设置止盈。"
+                if policy_bullish and sector_bullish:
+                    recommendation = "持有观望。价格处于长期上升趋势，虽短期可能超买，但政策共振较强且板块地位突出，可继续持有并设置止盈。"
+                elif policy_bullish:
+                    recommendation = "持有观望。价格处于长期上升趋势，虽短期可能超买，但政策共振较强，可继续持有并设置止盈。"
+                elif sector_bullish:
+                    recommendation = "持有观望。价格处于长期上升趋势，虽短期可能超买，但在板块中具有较强带动性，可持有并设置止盈。"
                 else:
                     recommendation = "持有观望。价格处于长期上升趋势，但短期可能超买，根据《专业投机原理》，可考虑减仓或设置止盈。"
             elif oversold:
-                if policy_bullish:
-                    recommendation = "积极买入。价格处于长期上升趋势，且短期可能超卖，政策共振较强，根据《专业投机原理》，这是较好的买入时机。"
+                if policy_bullish and sector_bullish:
+                    recommendation = "积极买入。价格处于长期上升趋势，且短期可能超卖，政策共振较强且板块地位突出，这是较好的买入时机。"
+                elif policy_bullish:
+                    recommendation = "积极买入。价格处于长期上升趋势，且短期可能超卖，政策共振较强，可根据专业投机原理》的趋势跟踪策略，这是较好的买入时机。"
+                elif sector_bullish:
+                    recommendation = "考虑买入。价格处于长期上升趋势，且短期可能超卖，在板块中具有较强带动性，可适量买入。"
                 else:
-                    recommendation = "考虑买入。价格处于长期上升趋势，且短期可能超卖，根据《专业投机原理》，这是较好的买入时机。"
+                    recommendation = "考虑买入。价格处于长期上升趋势，且短期可能超卖，可根据专业投机原理》的趋势跟踪策略，这是较好的买入时机。"
             elif tight_bands:
-                recommendation = "密切关注。布林带收缩，可能即将突破，在长期上升趋势中，突破方向可能向上，根据《专业投机原理》，可设置突破买入策略。"
-            else:
-                if policy_bullish:
-                    recommendation = "持有或适量买入。价格处于长期上升趋势，政策共振较强，根据《专业投机原理》的趋势跟踪策略，应跟随趋势操作。"
+                if sector_driving_force > 0.7:
+                    recommendation = "密切关注。布林带收缩，可能即将突破，在长期上升趋势中且具有较强板块带动性，突破方向可能向上，可设置突破买入策略。"
                 else:
-                    recommendation = "持有或小幅买入。价格处于长期上升趋势，根据《专业投机原理》的趋势跟踪策略，应跟随趋势操作。"
+                    recommendation = "密切关注。布林带收缩，可能即将突破，在长期上升趋势中，突破方向可能向上，可根据专业投机原理》的趋势跟踪策略，可设置突破买入策略。"
+            else:
+                if policy_bullish and sector_bullish:
+                    recommendation = "持有或适量买入。价格处于长期上升趋势，政策共振较强且板块地位突出，应跟随趋势操作。"
+                elif policy_bullish:
+                    recommendation = "持有或适量买入。价格处于长期上升趋势，政策共振较强，可根据专业投机原理》的趋势跟踪策略，应跟随趋势操作。"
+                elif sector_bullish:
+                    recommendation = "持有或小幅买入。价格处于长期上升趋势，在板块中具有较强地位，可跟随趋势操作。"
+                else:
+                    recommendation = "持有或小幅买入。价格处于长期上升趋势，可根据专业投机原理》的趋势跟踪策略，应跟随趋势操作。"
         else:
             # 长期下降趋势
             if overbought:
-                recommendation = "考虑减仓。价格处于长期下降趋势，且短期可能超买，根据《专业投机原理》，这可能是减仓的好时机。"
+                if sector_driving_force > 0.7:
+                    recommendation = "谨慎持有。价格处于长期下降趋势，但短期可能超买，且在板块中具有较强带动性，可能出现独立行情。"
+                else:
+                    recommendation = "考虑减仓。价格处于长期下降趋势，且短期可能超买，可根据专业投机原理》，这可能是减仓的好时机。"
             elif oversold:
-                if policy_bullish:
-                    recommendation = "观望或试探性买入。价格处于长期下降趋势，但短期可能超卖，且政策共振较强，根据《专业投机原理》，可小仓位试探。"
+                if policy_bullish and sector_bullish:
+                    recommendation = "观望或试探性买入。价格处于长期下降趋势，但短期可能超卖，且政策共振较强和板块地位突出，可小仓位试探。"
+                elif policy_bullish:
+                    recommendation = "观望或试探性买入。价格处于长期下降趋势，但短期可能超卖，且政策共振较强，可根据专业投机原理》的趋势跟踪策略，可小仓位试探。"
+                elif sector_bullish:
+                    recommendation = "观望或小幅试探。价格处于长期下降趋势，虽短期可能超卖，但在板块中具有一定地位，可少量试探。"
                 else:
-                    recommendation = "观望或小幅试探。价格处于长期下降趋势，虽短期可能超卖，但根据《专业投机原理》，不宜大量买入逆势品种。"
+                    recommendation = "观望或小幅试探。价格处于长期下降趋势，虽短期可能超卖，但可根据专业投机原理》的趋势跟踪策略，不宜大量买入逆势品种。"
             elif tight_bands:
-                recommendation = "密切关注。布林带收缩，可能即将突破，在长期下降趋势中，突破方向可能向下，根据《专业投机原理》，应保持谨慎。"
-            else:
-                if policy_bullish:
-                    recommendation = "观望。价格处于长期下降趋势，但政策共振较强，根据《专业投机原理》的趋势跟踪策略，可等待趋势转变信号。"
+                if sector_driving_force > 0.7:
+                    recommendation = "密切关注。布林带收缩，可能即将突破，虽处于长期下降趋势，但在板块中具有较强带动性，可能出现独立行情。"
                 else:
-                    recommendation = "观望或减仓。价格处于长期下降趋势，根据《专业投机原理》的趋势跟踪策略，应避免逆势操作。"
+                    recommendation = "密切关注。布林带收缩，可能即将突破，在长期下降趋势中，突破方向可能向下，可根据专业投机原理》的趋势跟踪策略，应保持谨慎。"
+            else:
+                if policy_bullish and sector_bullish:
+                    recommendation = "观望。价格处于长期下降趋势，但政策共振较强且板块地位突出，可等待趋势转变信号。"
+                elif policy_bullish:
+                    recommendation = "观望。价格处于长期下降趋势，但政策共振较强，可根据专业投机原理》的趋势跟踪策略，可等待趋势转变信号。"
+                elif sector_bullish:
+                    recommendation = "观望。价格处于长期下降趋势，但在板块中具有一定地位，可等待板块整体转强信号。"
+                else:
+                    recommendation = "观望或减仓。价格处于长期下降趋势，可根据专业投机原理》的趋势跟踪策略，应避免逆势操作。"
         
         # 生成摘要
         company_name = fundamentals.get('Name', symbol)
@@ -290,6 +384,20 @@ class AIService:
             f"长期趋势为{'上升' if long_term_bullish else '下降'}（200日均线），"
             f"布林带位置为{bb_position:.2f}（0-1，越接近1表示越接近上轨）。"
         )
+        
+        # 添加板块和概念信息
+        summary += f"在{sector_name}板块中"
+        if sector_driving_force > 0.7:
+            summary += f"具有较强带动性(驱动力:{sector_driving_force:.2f})，为板块龙头股。"
+        elif sector_driving_force > 0.4:
+            summary += f"具有一定带动性(驱动力:{sector_driving_force:.2f})。"
+        else:
+            summary += f"带动性较弱(驱动力:{sector_driving_force:.2f})。"
+        
+        if concept_strength > 0.6:
+            summary += f"所属概念整体较强(强度:{concept_strength:.2f})。"
+        else:
+            summary += f"所属概念整体较弱(强度:{concept_strength:.2f})。"
         
         # 添加政策共振信息
         if policy_coefficient > 0:
@@ -318,6 +426,8 @@ class AIService:
         historical_data: pd.DataFrame,
         fundamentals: Dict[str, Any],
         news_sentiment: Dict[str, Any],
+        sector_linkage: Dict[str, Any],
+        concept_distribution: Dict[str, Any],
         technical_indicators: Dict[str, float]
     ) -> AIAnalysis:
         """使用机器学习模型分析股票"""
@@ -326,7 +436,9 @@ class AIService:
             symbol,
             historical_data,
             fundamentals,
-            technical_indicators
+            technical_indicators,
+            sector_linkage,
+            concept_distribution
         )
         
         # 如果机器学习分析失败，回退到规则分析
@@ -338,6 +450,8 @@ class AIService:
                 historical_data,
                 fundamentals,
                 news_sentiment,
+                sector_linkage,
+                concept_distribution,
                 technical_indicators
             )
         
@@ -350,6 +464,8 @@ class AIService:
         historical_data: pd.DataFrame,
         fundamentals: Dict[str, Any],
         news_sentiment: Dict[str, Any],
+        sector_linkage: Dict[str, Any],
+        concept_distribution: Dict[str, Any],
         technical_indicators: Dict[str, float]
     ) -> AIAnalysis:
         """使用大语言模型分析股票"""
@@ -404,6 +520,7 @@ class AIService:
                 "布林带则用于判断短期超买超卖状态，价格接近上轨可能超买，接近下轨可能超卖。"
                 "布林带收窄表示波动性降低，可能即将出现大幅突破行情。"
                 "政策共振系数反映股票与近期政策的关联度，高共振系数表明股票可能受政策影响较大。"
+                "板块联动性和概念涨跌分布反映个股在板块中的地位和主动性，高带动性表明个股可能引领板块走势。"
             )
             
             # 确保news_sentiment包含policy_resonance字段
@@ -420,6 +537,8 @@ class AIService:
                 historical_dict,
                 fundamentals,
                 news_sentiment,
+                sector_linkage,
+                concept_distribution,
                 enhanced_technical_indicators
             )
             
@@ -441,6 +560,8 @@ class AIService:
                 historical_data,
                 fundamentals,
                 news_sentiment,
+                sector_linkage,
+                concept_distribution,
                 technical_indicators
             )
     

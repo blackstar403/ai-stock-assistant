@@ -25,8 +25,10 @@ class OpenAIService:
         stock_info: Dict[str, Any], 
         historical_data: Dict[str, Any],
         fundamentals: Dict[str, Any],
-        technical_indicators: Dict[str, Any],
-        news_sentiment: Dict[str, Any]
+        news_sentiment: Dict[str, Any],
+        sector_linkage: Dict[str, Any],
+        concept_distribution: Dict[str, Any],
+        technical_indicators: Dict[str, Any]
     ) -> Dict[str, Any]:
         """使用 OpenAI 分析股票"""
         try:
@@ -37,7 +39,9 @@ class OpenAIService:
                 historical_data,
                 fundamentals,
                 technical_indicators,
-                news_sentiment
+                news_sentiment,
+                sector_linkage,
+                concept_distribution
             )
             
             # 调用 OpenAI API
@@ -74,7 +78,9 @@ class OpenAIService:
         historical_data: Dict[str, Any],
         fundamentals: Dict[str, Any],
         technical_indicators: Dict[str, Any],
-        news_sentiment: Dict[str, Any]
+        news_sentiment: Dict[str, Any],
+        sector_linkage: Dict[str, Any],
+        concept_distribution: Dict[str, Any]
     ) -> str:
         """准备 OpenAI 提示词"""
         # 格式化历史数据
@@ -137,6 +143,48 @@ class OpenAIService:
                     for policy in policies:
                         policy_summary += f"  * {policy.get('title', 'N/A')} ({policy.get('date', 'N/A')}) - 相关度: {policy.get('relevance', 0)}\n"
         
+        # 格式化板块联动性信息
+        sector_summary = ""
+        sector_name = sector_linkage.get('sector_name', '未知板块')
+        sector_driving_force = sector_linkage.get('driving_force', 0)
+        sector_correlation = sector_linkage.get('correlation', 0)
+        sector_rank = sector_linkage.get('rank_in_sector', 0)
+        sector_total = sector_linkage.get('total_in_sector', 0)
+        
+        sector_summary = f"""
+板块联动性分析:
+- 所属板块: {sector_name}
+- 板块带动性: {sector_driving_force:.2f} (0-1之间，越高表示对板块的带动作用越强)
+- 板块联动性: {sector_correlation:.2f} (0-1之间，越高表示与板块整体走势越同步)
+"""
+        if sector_rank > 0 and sector_total > 0:
+            sector_summary += f"- 板块排名: {sector_rank}/{sector_total}\n"
+        
+        # 格式化概念涨跌分布信息
+        concept_summary = ""
+        concept_strength = concept_distribution.get('overall_strength', 0)
+        leading_concepts = concept_distribution.get('leading_concepts', [])
+        lagging_concepts = concept_distribution.get('lagging_concepts', [])
+        all_concepts = concept_distribution.get('all_concepts', [])
+        
+        concept_summary = f"""
+概念涨跌分布分析:
+- 概念整体强度: {concept_strength:.2f} (0-1之间，越高表示所属概念整体越强势)
+"""
+        
+        if leading_concepts:
+            concept_summary += "- 表现领先的概念:\n"
+            for concept in leading_concepts[:3]:  # 最多显示3个
+                concept_summary += f"  * {concept.get('name', 'N/A')} - 强度: {concept.get('strength', 0):.2f}, 排名: {concept.get('rank', 0)}/{concept.get('total', 0)}\n"
+        
+        if lagging_concepts:
+            concept_summary += "- 表现落后的概念:\n"
+            for concept in lagging_concepts[:2]:  # 最多显示2个
+                concept_summary += f"  * {concept.get('name', 'N/A')} - 强度: {concept.get('strength', 0):.2f}, 排名: {concept.get('rank', 0)}/{concept.get('total', 0)}\n"
+        
+        if all_concepts and len(all_concepts) > 0:
+            concept_summary += f"- 所属概念数量: {len(all_concepts)}\n"
+        
         # 添加《专业投机原理》的分析框架
         professional_principles = ""
         if 'ProfessionalSpeculationPrinciples' in technical_indicators:
@@ -149,6 +197,8 @@ class OpenAIService:
 2. 布林带指标的位置和宽度（判断短期超买超卖和波动性）
 3. 趋势跟踪策略（顺势而为，避免逆势操作）
 4. 政策共振因素（政策与股票的相关性）
+5. 板块联动性和个股地位（判断个股带动性和主动性）
+6. 概念涨跌分布（判断概念支撑强度）
 """
         
         # 构建完整提示词
@@ -170,13 +220,17 @@ class OpenAIService:
 
 {policy_summary}
 
+{sector_summary}
+
+{concept_summary}
+
 {professional_principles}
 
 请提供以下格式的JSON分析结果:
-1. summary: 对股票当前状况的简要总结，包括价格相对于200日均线和布林带的位置，以及政策共振情况
+1. summary: 对股票当前状况的简要总结，包括价格相对于200日均线和布林带的位置，以及政策共振情况、板块地位和概念强度
 2. sentiment: 市场情绪 (positive, neutral, negative)
-3. keyPoints: 关键分析点列表 (至少5点)，包括对布林带、200日均线和政策共振的分析
-4. recommendation: 投资建议，参考《专业投机原理》的趋势跟踪策略，并考虑政策共振因素
+3. keyPoints: 关键分析点列表 (至少7点)，包括对布林带、200日均线、政策共振、板块联动性和概念涨跌分布的分析
+4. recommendation: 投资建议，参考《专业投机原理》的趋势跟踪策略，并考虑政策共振因素、板块地位和概念强度
 5. riskLevel: 风险水平 (low, medium, high)
 
 请确保返回的是有效的JSON格式。

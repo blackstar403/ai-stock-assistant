@@ -2,6 +2,7 @@ import tushare as ts
 from typing import List, Optional, Dict, Any
 import pandas as pd
 from datetime import datetime, timedelta
+import re
 
 from app.core.config import settings
 from app.services.data_sources.base import DataSourceBase
@@ -287,10 +288,180 @@ class TushareDataSource(DataSourceBase):
         try:
             # Tushare 没有直接提供新闻情绪分析，返回一个空结果
             # 在实际应用中，可以考虑接入第三方新闻 API 或情感分析服务
+            
+            # 尝试获取一些相关新闻
+            code_match = re.match(r'(\d+)\.([A-Z]+)', symbol)
+            if code_match:
+                code = code_match.group(1)
+                market = code_match.group(2)
+                
+                # 转换为 Tushare 格式的代码
+                ts_code = f"{code}.{'SH' if market == 'SH' else 'SZ'}"
+                
+                try:
+                    # 获取公司新闻
+                    df = self.api.news(ts_code=ts_code, start_date=(datetime.now() - timedelta(days=30)).strftime('%Y%m%d'))
+                    
+                    if not df.empty:
+                        feed = []
+                        for _, row in df.iterrows():
+                            feed.append({
+                                "title": row["content"] if "content" in row else "",
+                                "url": "",
+                                "time_published": row["datetime"] if "datetime" in row else "",
+                                "overall_sentiment_score": 0  # 没有情感分析，默认为中性
+                            })
+                        
+                        return {
+                            "feed": feed,
+                            "sentiment_score_avg": 0,
+                            "policy_resonance": {
+                                "coefficient": 0,
+                                "policies": []
+                            }
+                        }
+                except:
+                    pass
+            
             return {
                 "feed": [],
-                "sentiment_score_avg": 0
+                "sentiment_score_avg": 0,
+                "policy_resonance": {
+                    "coefficient": 0,
+                    "policies": []
+                }
             }
         except Exception as e:
             print(f"获取新闻情绪时出错: {str(e)}")
-            return {} 
+            return {
+                "feed": [],
+                "sentiment_score_avg": 0,
+                "policy_resonance": {
+                    "coefficient": 0,
+                    "policies": []
+                }
+            }
+    
+    async def get_sector_linkage(self, symbol: str) -> Dict[str, Any]:
+        """获取板块联动性分析"""
+        try:
+            # 解析股票代码
+            code_match = re.match(r'(\d+)\.([A-Z]+)', symbol)
+            if not code_match:
+                return self._default_sector_linkage()
+            
+            code = code_match.group(1)
+            market = code_match.group(2)
+            
+            # 转换为 Tushare 格式的代码
+            ts_code = f"{code}.{'SH' if market == 'SH' else 'SZ'}"
+            
+            try:
+                # 获取股票所属行业
+                stock_basic = self.api.stock_basic(ts_code=ts_code, fields='ts_code,name,industry')
+                
+                if stock_basic.empty:
+                    return self._default_sector_linkage()
+                
+                sector_name = stock_basic.iloc[0]['industry']
+                
+                if not sector_name or pd.isna(sector_name):
+                    return self._default_sector_linkage()
+                
+                # 获取同行业股票
+                industry_stocks = self.api.stock_basic(industry=sector_name, fields='ts_code,name')
+                sector_total = len(industry_stocks)
+                
+                if sector_total <= 1:
+                    return self._default_sector_linkage(sector_name)
+                
+                # 由于 Tushare 的 API 限制，这里只返回基本信息，不计算相关性和带动性
+                return {
+                    "sector_name": sector_name,
+                    "correlation": 0.5,  # 默认中等相关性
+                    "driving_force": 0.3,  # 默认较低带动性
+                    "rank_in_sector": 0,
+                    "total_in_sector": sector_total
+                }
+            
+            except Exception as e:
+                print(f"获取板块联动性时出错: {str(e)}")
+                return self._default_sector_linkage()
+        
+        except Exception as e:
+            print(f"获取板块联动性时出错: {str(e)}")
+            return self._default_sector_linkage()
+    
+    def _default_sector_linkage(self, sector_name="未知板块") -> Dict[str, Any]:
+        """返回默认的板块联动性数据"""
+        return {
+            "sector_name": sector_name,
+            "correlation": 0.5,
+            "driving_force": 0.3,
+            "rank_in_sector": 0,
+            "total_in_sector": 0
+        }
+    
+    async def get_concept_distribution(self, symbol: str) -> Dict[str, Any]:
+        """获取概念涨跌分布分析"""
+        try:
+            # 解析股票代码
+            code_match = re.match(r'(\d+)\.([A-Z]+)', symbol)
+            if not code_match:
+                return self._default_concept_distribution()
+            
+            code = code_match.group(1)
+            market = code_match.group(2)
+            
+            # 转换为 Tushare 格式的代码
+            ts_code = f"{code}.{'SH' if market == 'SH' else 'SZ'}"
+            
+            try:
+                # 获取股票所属概念
+                concept_detail = self.api.concept_detail(ts_code=ts_code)
+                
+                if concept_detail.empty:
+                    return self._default_concept_distribution()
+                
+                # 获取概念列表
+                concepts = []
+                for _, row in concept_detail.iterrows():
+                    concept_name = row['concept_name']
+                    concept_code = row['id']
+                    
+                    concepts.append({
+                        "name": concept_name,
+                        "code": concept_code,
+                        "strength": 0.5,  # 默认中等强度
+                        "relative_performance": 0,
+                        "rank": 1,
+                        "total": 1
+                    })
+                
+                if not concepts:
+                    return self._default_concept_distribution()
+                
+                # 由于 Tushare 的 API 限制，这里只返回基本信息，不计算概念强度
+                return {
+                    "overall_strength": 0.5,  # 默认中等强度
+                    "leading_concepts": concepts[:3] if len(concepts) > 3 else concepts,
+                    "lagging_concepts": [],
+                    "all_concepts": concepts
+                }
+            
+            except Exception as e:
+                print(f"获取概念涨跌分布时出错: {str(e)}")
+                return self._default_concept_distribution()
+        
+        except Exception as e:
+            print(f"获取概念涨跌分布时出错: {str(e)}")
+            return self._default_concept_distribution()
+    
+    def _default_concept_distribution(self) -> Dict[str, Any]:
+        """返回默认的概念涨跌分布数据"""
+        return {
+            "overall_strength": 0.5,
+            "leading_concepts": [],
+            "lagging_concepts": [],
+            "all_concepts": []
+        } 
