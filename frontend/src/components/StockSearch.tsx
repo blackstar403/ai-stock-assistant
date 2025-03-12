@@ -77,7 +77,7 @@ export default function StockSearch({ onSelectStock }: StockSearchProps) {
         />
         <Button onClick={handleSearch} isLoading={loading}>
           {!loading && <Search className="h-4 w-4 mr-2" />}
-          搜索
+          Search
         </Button>
       </div>
       

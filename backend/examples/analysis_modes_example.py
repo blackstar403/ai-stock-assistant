@@ -24,7 +24,7 @@ async def analyze_with_all_modes(symbol: str, data_source: str = None):
     print(f"{'='*80}")
     
     # 使用三种不同的分析模式
-    modes = ["rule", "ml", "llm"]
+    modes = [ "rule", "ml", "llm"]
     
     for mode in modes:
         print(f"\n{'-'*40}")
@@ -50,13 +50,13 @@ async def analyze_with_all_modes(symbol: str, data_source: str = None):
 async def main():
     """主函数"""
     # 美股示例
-    await analyze_with_all_modes("AAPL", "alphavantage")
+    # await analyze_with_all_modes("AAPL", "alphavantage")
     
     # A股示例
-    await analyze_with_all_modes("000001.SZ", "tushare")
+    await analyze_with_all_modes("000001.SZ", "akshare")
     
     # 港股示例
-    await analyze_with_all_modes("00700.HK", "akshare")
+    # await analyze_with_all_modes("000001.SZ", "akshare")
 
 if __name__ == "__main__":
     # 检查是否配置了必要的API密钥

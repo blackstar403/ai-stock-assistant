@@ -87,10 +87,10 @@ class AKShareDataSource(DataSourceBase):
             # 计算涨跌幅
             price = float(row['最新价'])
             change = float(row['涨跌额'])
-            change_percent = float(row['涨跌幅'].replace('%', ''))
+            change_percent = float(row['涨跌幅'])
             
             # 获取市值（亿元转为元）
-            market_cap = float(row['总市值']) * 100000000 if '总市值' in row else 0
+            market_cap = float(row['总市值']) if '总市值' in row else 0
             
             # 获取成交量（手转为股）
             volume = int(row['成交量']) * 100 if '成交量' in row else 0
@@ -180,8 +180,14 @@ class AKShareDataSource(DataSourceBase):
             for _, row in df.iterrows():
                 # 将日期转换为字符串格式
                 date_str = row['日期']
-                if isinstance(date_str, pd.Timestamp):
+                if isinstance(date_str, datetime):
                     date_str = date_str.strftime('%Y-%m-%d')
+                elif isinstance(date_str, pd.Timestamp):
+                    date_str = date_str.strftime('%Y-%m-%d')
+                elif isinstance(date_str, str):
+                    date_str = date_str
+                else:
+                    date_str = str(date_str)
                 
                 price_point = StockPricePoint(
                     date=date_str,
@@ -215,7 +221,7 @@ class AKShareDataSource(DataSourceBase):
             financial_indicator = ak.stock_financial_analysis_indicator(symbol=code)
             
             # 获取市盈率、市净率等指标
-            stock_a_lg_indicator = ak.stock_a_lg_indicator(symbol=code)
+            stock_a_lg_indicator = ak.stock_a_indicator_lg(symbol=code)
             
             # 合并数据
             result = {}
@@ -223,7 +229,7 @@ class AKShareDataSource(DataSourceBase):
             # 处理公司基本信息
             if not stock_info.empty:
                 for _, row in stock_info.iterrows():
-                    result[row[0]] = row[1]
+                    result[row.iloc[0]] = row.iloc[1]
             
             # 处理最新的财务指标
             if not financial_indicator.empty:
