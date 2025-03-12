@@ -168,6 +168,22 @@ class AIService:
         else:
             key_points.append(f"RSI为{technical_indicators['RSI']:.2f}，处于中性区间")
         
+        # 政策共振分析
+        policy_resonance = news_sentiment.get('policy_resonance', {})
+        policy_coefficient = policy_resonance.get('coefficient', 0)
+        relevant_policies = policy_resonance.get('policies', [])
+        
+        if policy_coefficient > 0:
+            if policy_coefficient > 0.7:
+                key_points.append(f"政策共振系数较高({policy_coefficient:.2f})，表明该股票与近期政策高度相关")
+                if relevant_policies:
+                    policy_titles = [p.get('title', '') for p in relevant_policies[:2]]
+                    key_points.append(f"相关政策: {', '.join(policy_titles)}")
+            elif policy_coefficient > 0.3:
+                key_points.append(f"政策共振系数中等({policy_coefficient:.2f})，表明该股票受近期政策影响")
+            else:
+                key_points.append(f"政策共振系数较低({policy_coefficient:.2f})，表明该股票与近期政策关联度不高")
+        
         # 基本面关键点
         if fundamentals:
             pe_ratio = fundamentals.get('PERatio', 'N/A')
@@ -199,6 +215,18 @@ class AIService:
         elif volatility < 1:
             risk_level = "low"
         
+        # 政策风险调整
+        if policy_coefficient > 0.5:
+            # 政策共振高时，根据政策性质调整风险
+            if long_term_trend == "上升":
+                # 上升趋势中的高政策共振可能是利好，降低风险
+                if risk_level == "high":
+                    risk_level = "medium"
+            else:
+                # 下降趋势中的高政策共振可能是利空，提高风险
+                if risk_level == "low":
+                    risk_level = "medium"
+        
         # 生成建议（根据《专业投机原理》的趋势跟踪和反转策略）
         # 综合考虑200日均线（长期趋势）、布林带位置（短期超买超卖）和RSI
         
@@ -213,26 +241,45 @@ class AIService:
         # 布林带收缩判断（可能突破）
         tight_bands = technical_indicators['BB_Width'] < 0.05
         
+        # 政策因素
+        policy_bullish = policy_coefficient > 0.5
+        
+        # 综合建议
         if long_term_bullish:
             # 长期上升趋势
             if overbought:
-                recommendation = "持有观望。价格处于长期上升趋势，但短期可能超买，根据《专业投机原理》，可考虑减仓或设置止盈。"
+                if policy_bullish:
+                    recommendation = "持有观望。价格处于长期上升趋势，虽短期可能超买，但政策共振较强，根据《专业投机原理》，可继续持有并设置止盈。"
+                else:
+                    recommendation = "持有观望。价格处于长期上升趋势，但短期可能超买，根据《专业投机原理》，可考虑减仓或设置止盈。"
             elif oversold:
-                recommendation = "考虑买入。价格处于长期上升趋势，且短期可能超卖，根据《专业投机原理》，这是较好的买入时机。"
+                if policy_bullish:
+                    recommendation = "积极买入。价格处于长期上升趋势，且短期可能超卖，政策共振较强，根据《专业投机原理》，这是较好的买入时机。"
+                else:
+                    recommendation = "考虑买入。价格处于长期上升趋势，且短期可能超卖，根据《专业投机原理》，这是较好的买入时机。"
             elif tight_bands:
                 recommendation = "密切关注。布林带收缩，可能即将突破，在长期上升趋势中，突破方向可能向上，根据《专业投机原理》，可设置突破买入策略。"
             else:
-                recommendation = "持有或小幅买入。价格处于长期上升趋势，根据《专业投机原理》的趋势跟踪策略，应跟随趋势操作。"
+                if policy_bullish:
+                    recommendation = "持有或适量买入。价格处于长期上升趋势，政策共振较强，根据《专业投机原理》的趋势跟踪策略，应跟随趋势操作。"
+                else:
+                    recommendation = "持有或小幅买入。价格处于长期上升趋势，根据《专业投机原理》的趋势跟踪策略，应跟随趋势操作。"
         else:
             # 长期下降趋势
             if overbought:
                 recommendation = "考虑减仓。价格处于长期下降趋势，且短期可能超买，根据《专业投机原理》，这可能是减仓的好时机。"
             elif oversold:
-                recommendation = "观望或小幅试探。价格处于长期下降趋势，虽短期可能超卖，但根据《专业投机原理》，不宜大量买入逆势品种。"
+                if policy_bullish:
+                    recommendation = "观望或试探性买入。价格处于长期下降趋势，但短期可能超卖，且政策共振较强，根据《专业投机原理》，可小仓位试探。"
+                else:
+                    recommendation = "观望或小幅试探。价格处于长期下降趋势，虽短期可能超卖，但根据《专业投机原理》，不宜大量买入逆势品种。"
             elif tight_bands:
                 recommendation = "密切关注。布林带收缩，可能即将突破，在长期下降趋势中，突破方向可能向下，根据《专业投机原理》，应保持谨慎。"
             else:
-                recommendation = "观望或减仓。价格处于长期下降趋势，根据《专业投机原理》的趋势跟踪策略，应避免逆势操作。"
+                if policy_bullish:
+                    recommendation = "观望。价格处于长期下降趋势，但政策共振较强，根据《专业投机原理》的趋势跟踪策略，可等待趋势转变信号。"
+                else:
+                    recommendation = "观望或减仓。价格处于长期下降趋势，根据《专业投机原理》的趋势跟踪策略，应避免逆势操作。"
         
         # 生成摘要
         company_name = fundamentals.get('Name', symbol)
@@ -242,8 +289,19 @@ class AIService:
             f"基于技术分析和市场情绪，股票当前呈现{sentiment}态势。"
             f"长期趋势为{'上升' if long_term_bullish else '下降'}（200日均线），"
             f"布林带位置为{bb_position:.2f}（0-1，越接近1表示越接近上轨）。"
-            f"风险水平评估为{risk_level}。"
         )
+        
+        # 添加政策共振信息
+        if policy_coefficient > 0:
+            summary += f"政策共振系数为{policy_coefficient:.2f}，"
+            if policy_coefficient > 0.7:
+                summary += "与近期政策高度相关。"
+            elif policy_coefficient > 0.3:
+                summary += "与近期政策有一定关联。"
+            else:
+                summary += "与近期政策关联度较低。"
+        
+        summary += f"风险水平评估为{risk_level}。"
         
         return AIAnalysis(
             summary=summary,
@@ -345,7 +403,15 @@ class AIService:
                 "根据《专业投机原理》，200日均线是判断长期趋势的重要指标，价格在200日均线之上视为多头市场，之下视为空头市场。"
                 "布林带则用于判断短期超买超卖状态，价格接近上轨可能超买，接近下轨可能超卖。"
                 "布林带收窄表示波动性降低，可能即将出现大幅突破行情。"
+                "政策共振系数反映股票与近期政策的关联度，高共振系数表明股票可能受政策影响较大。"
             )
+            
+            # 确保news_sentiment包含policy_resonance字段
+            if 'policy_resonance' not in news_sentiment:
+                news_sentiment['policy_resonance'] = {
+                    'coefficient': 0,
+                    'policies': []
+                }
             
             # 调用 OpenAI 服务
             result = await openai_service.analyze_stock(
@@ -393,8 +459,8 @@ class AIService:
         indicators['Price_vs_SMA200'] = current_price / indicators['SMA_200'] - 1  # 正值表示价格在200日均线上方
 
         # 计算布林带指标 (Bollinger Bands)
-        sma_20 = df['close'].rolling(window=99).mean()
-        std_20 = df['close'].rolling(window=99).std()
+        sma_20 = df['close'].rolling(window=20).mean()
+        std_20 = df['close'].rolling(window=20).std()
         indicators['BB_Upper'] = (sma_20 + (std_20 * 2)).iloc[-1]  # 上轨（均线+2倍标准差）
         indicators['BB_Middle'] = sma_20.iloc[-1]  # 中轨（20日均线）
         indicators['BB_Lower'] = (sma_20 - (std_20 * 2)).iloc[-1]  # 下轨（均线-2倍标准差）

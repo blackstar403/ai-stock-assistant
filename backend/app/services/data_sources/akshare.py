@@ -321,12 +321,19 @@ class AKShareDataSource(DataSourceBase):
             return None
     
     async def get_news_sentiment(self, symbol: str) -> Dict[str, Any]:
-        """获取新闻情绪分析"""
+        """获取新闻情绪分析和政策共振系数"""
         try:
-            # AKShare 没有直接提供新闻情绪分析，返回一个空结果
-            # 在实际应用中，可以考虑接入第三方新闻 API 或情感分析服务
+            # 初始化结果
+            result = {
+                "feed": [],
+                "sentiment_score_avg": 0,
+                "policy_resonance": {
+                    "coefficient": 0,
+                    "policies": []
+                }
+            }
             
-            # 尝试获取一些相关新闻
+            # 获取股票相关新闻
             code_match = re.match(r'(\d+)\.([A-Z]+)', symbol)
             if code_match:
                 code = code_match.group(1)
@@ -344,17 +351,142 @@ class AKShareDataSource(DataSourceBase):
                                 "overall_sentiment_score": 0  # 没有情感分析，默认为中性
                             })
                         
-                        return {
-                            "feed": feed,
-                            "sentiment_score_avg": 0
-                        }
-                except:
-                    pass
+                        result["feed"] = feed
+                except Exception as e:
+                    print(f"获取股票新闻时出错: {str(e)}")
             
-            return {
-                "feed": [],
-                "sentiment_score_avg": 0
-            }
+            # 获取政策新闻并计算政策共振系数
+            try:
+                # 获取最近的经济政策新闻
+                policy_data = ak.news_economic_baidu()
+                
+                if not policy_data.empty:
+                    # 获取股票名称
+                    stock_name = ""
+                    if code_match:
+                        try:
+                            stock_info = await self.get_stock_info(symbol)
+                            if stock_info:
+                                stock_name = stock_info.name
+                        except:
+                            pass
+                    
+                    # 计算政策共振系数
+                    # 1. 提取最近30条政策新闻
+                    recent_policies = policy_data.head(30)
+                    
+                    # 2. 初始化共振分数
+                    resonance_score = 0
+                    relevant_policies = []
+                    
+                    # 3. 分析每条政策新闻与股票的相关性
+                    for _, policy in recent_policies.iterrows():
+                        policy_title = policy.get("title", "")
+                        policy_content = policy.get("content", "")
+                        policy_date = policy.get("date", "")
+                        
+                        # 计算相关性分数 (简单的关键词匹配)
+                        relevance = 0
+                        
+                        # 如果政策标题或内容包含股票名称，增加相关性
+                        if stock_name and (stock_name in policy_title or stock_name in policy_content):
+                            relevance += 3
+                        
+                        # 分析政策对行业的影响
+                        industry_keywords = self._get_industry_keywords(symbol)
+                        for keyword in industry_keywords:
+                            if keyword in policy_title:
+                                relevance += 2
+                            elif keyword in policy_content:
+                                relevance += 1
+                        
+                        # 如果政策相关，添加到相关政策列表
+                        if relevance > 0:
+                            resonance_score += relevance
+                            relevant_policies.append({
+                                "title": policy_title,
+                                "date": policy_date,
+                                "relevance": relevance,
+                                "url": policy.get("url", "")
+                            })
+                    
+                    # 4. 计算最终共振系数 (0-1之间)
+                    if relevant_policies:
+                        # 归一化共振分数 (最大可能分数为30条政策*最高相关性5=150)
+                        normalized_score = min(1.0, resonance_score / 30)
+                        result["policy_resonance"]["coefficient"] = normalized_score
+                        result["policy_resonance"]["policies"] = relevant_policies[:5]  # 只返回最相关的5条
+            
+            except Exception as e:
+                print(f"计算政策共振系数时出错: {str(e)}")
+            
+            return result
         except Exception as e:
             print(f"获取新闻情绪时出错: {str(e)}")
-            return {}
+            return {
+                "feed": [],
+                "sentiment_score_avg": 0,
+                "policy_resonance": {
+                    "coefficient": 0,
+                    "policies": []
+                }
+            }
+    
+    def _get_industry_keywords(self, symbol: str) -> List[str]:
+        """获取股票所属行业的关键词"""
+        try:
+            # 从股票代码判断行业
+            code_match = re.match(r'(\d+)\.([A-Z]+)', symbol)
+            if not code_match:
+                return []
+            
+            code = code_match.group(1)
+            
+            # 尝试获取股票所属行业
+            try:
+                stock_industry = ak.stock_industry_category_cninfo()
+                stock_row = stock_industry[stock_industry['证券代码'] == code]
+                
+                if not stock_row.empty:
+                    industry = stock_row.iloc[0]['所属行业']
+                    # 根据行业返回相关关键词
+                    return self._industry_to_keywords(industry)
+            except:
+                pass
+            
+            # 默认关键词
+            return ["经济", "政策", "发展", "改革", "创新", "金融", "市场", "投资"]
+        except:
+            return ["经济", "政策", "发展", "改革", "创新", "金融", "市场", "投资"]
+    
+    def _industry_to_keywords(self, industry: str) -> List[str]:
+        """根据行业返回相关关键词"""
+        # 行业关键词映射
+        industry_keywords = {
+            "农业": ["农业", "种植", "农产品", "粮食", "农村", "乡村振兴"],
+            "采矿业": ["矿业", "采矿", "矿产", "资源", "能源", "开采"],
+            "制造业": ["制造", "工业", "生产", "加工", "工厂", "智能制造"],
+            "电力": ["电力", "能源", "电网", "发电", "新能源", "碳中和"],
+            "建筑业": ["建筑", "房地产", "基建", "工程", "城市建设"],
+            "批发和零售业": ["零售", "商业", "消费", "电商", "商超", "贸易"],
+            "交通运输": ["交通", "运输", "物流", "航运", "铁路", "公路"],
+            "住宿和餐饮业": ["餐饮", "旅游", "酒店", "服务业", "消费"],
+            "信息技术": ["科技", "互联网", "软件", "信息", "数字化", "人工智能", "大数据"],
+            "金融业": ["金融", "银行", "保险", "证券", "投资", "理财"],
+            "房地产业": ["房地产", "地产", "楼市", "住房", "建设"],
+            "科学研究": ["科研", "研发", "创新", "技术", "专利"],
+            "水利环境": ["环保", "水利", "生态", "环境", "可持续"],
+            "居民服务": ["服务", "社区", "民生", "消费"],
+            "教育": ["教育", "培训", "学校", "教学", "学习"],
+            "卫生和社会工作": ["医疗", "卫生", "健康", "社会保障", "养老"],
+            "文化体育娱乐业": ["文化", "体育", "娱乐", "传媒", "影视", "游戏"],
+            "公共管理": ["公共", "管理", "政务", "行政"]
+        }
+        
+        # 查找最匹配的行业
+        for key, keywords in industry_keywords.items():
+            if key in industry:
+                return keywords + ["经济", "政策", "发展", "改革"]
+        
+        # 默认关键词
+        return ["经济", "政策", "发展", "改革", "创新", "金融", "市场", "投资"]

@@ -120,6 +120,23 @@ class OpenAIService:
         else:
             news_summary += "- 无相关新闻\n"
         
+        # 格式化政策共振信息
+        policy_summary = ""
+        if "policy_resonance" in news_sentiment:
+            policy_resonance = news_sentiment["policy_resonance"]
+            coefficient = policy_resonance.get("coefficient", 0)
+            policies = policy_resonance.get("policies", [])
+            
+            if coefficient > 0:
+                policy_summary = f"""
+政策共振分析:
+- 共振系数: {coefficient:.2f} (0-1之间，越高表示与政策关联度越高)
+"""
+                if policies:
+                    policy_summary += "- 相关政策:\n"
+                    for policy in policies:
+                        policy_summary += f"  * {policy.get('title', 'N/A')} ({policy.get('date', 'N/A')}) - 相关度: {policy.get('relevance', 0)}\n"
+        
         # 添加《专业投机原理》的分析框架
         professional_principles = ""
         if 'ProfessionalSpeculationPrinciples' in technical_indicators:
@@ -131,6 +148,7 @@ class OpenAIService:
 1. 价格相对于200日均线的位置（判断长期趋势）
 2. 布林带指标的位置和宽度（判断短期超买超卖和波动性）
 3. 趋势跟踪策略（顺势而为，避免逆势操作）
+4. 政策共振因素（政策与股票的相关性）
 """
         
         # 构建完整提示词
@@ -150,13 +168,15 @@ class OpenAIService:
 
 {news_summary}
 
+{policy_summary}
+
 {professional_principles}
 
 请提供以下格式的JSON分析结果:
-1. summary: 对股票当前状况的简要总结，包括价格相对于200日均线和布林带的位置
+1. summary: 对股票当前状况的简要总结，包括价格相对于200日均线和布林带的位置，以及政策共振情况
 2. sentiment: 市场情绪 (positive, neutral, negative)
-3. keyPoints: 关键分析点列表 (至少5点)，包括对布林带和200日均线的分析
-4. recommendation: 投资建议，参考《专业投机原理》的趋势跟踪策略
+3. keyPoints: 关键分析点列表 (至少5点)，包括对布林带、200日均线和政策共振的分析
+4. recommendation: 投资建议，参考《专业投机原理》的趋势跟踪策略，并考虑政策共振因素
 5. riskLevel: 风险水平 (low, medium, high)
 
 请确保返回的是有效的JSON格式。
