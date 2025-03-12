@@ -288,7 +288,7 @@ class AKShareDataSource(DataSourceBase):
             
             # 获取最近100个交易日的数据
             end_date = datetime.now().strftime('%Y%m%d')
-            start_date = (datetime.now() - timedelta(days=150)).strftime('%Y%m%d')
+            start_date = (datetime.now() - timedelta(days=365)).strftime('%Y%m%d')
             
             df = ak.stock_zh_a_hist(
                 symbol=code, 
@@ -297,6 +297,7 @@ class AKShareDataSource(DataSourceBase):
                 end_date=end_date, 
                 adjust="qfq"
             )
+            print(f"获取历史数据: {len(df)}")
             
             if df.empty:
                 return None

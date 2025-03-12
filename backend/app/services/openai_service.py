@@ -86,7 +86,19 @@ class OpenAIService:
         
         # 格式化技术指标
         technical_summary = "技术指标:\n"
+        
+        # 先添加重要的布林带和200日均线指标（如果存在）
+        if 'BB_Description' in technical_indicators:
+            technical_summary += f"- {technical_indicators['BB_Description']}\n"
+        
+        if 'SMA200_Description' in technical_indicators:
+            technical_summary += f"- {technical_indicators['SMA200_Description']}\n"
+        
+        # 添加其他技术指标
         for indicator, value in technical_indicators.items():
+            # 跳过已经添加的描述性指标和非数值指标
+            if indicator in ['BB_Description', 'SMA200_Description', 'ProfessionalSpeculationPrinciples'] or not isinstance(value, (int, float)):
+                continue
             technical_summary += f"- {indicator}: {value:.2f}\n"
         
         # 格式化基本面数据
@@ -108,6 +120,19 @@ class OpenAIService:
         else:
             news_summary += "- 无相关新闻\n"
         
+        # 添加《专业投机原理》的分析框架
+        professional_principles = ""
+        if 'ProfessionalSpeculationPrinciples' in technical_indicators:
+            professional_principles = f"""
+《专业投机原理》分析框架:
+{technical_indicators['ProfessionalSpeculationPrinciples']}
+
+根据《专业投机原理》，请特别关注:
+1. 价格相对于200日均线的位置（判断长期趋势）
+2. 布林带指标的位置和宽度（判断短期超买超卖和波动性）
+3. 趋势跟踪策略（顺势而为，避免逆势操作）
+"""
+        
         # 构建完整提示词
         prompt = f"""
 请分析以下股票数据并提供专业的投资建议。
@@ -125,11 +150,13 @@ class OpenAIService:
 
 {news_summary}
 
+{professional_principles}
+
 请提供以下格式的JSON分析结果:
-1. summary: 对股票当前状况的简要总结
+1. summary: 对股票当前状况的简要总结，包括价格相对于200日均线和布林带的位置
 2. sentiment: 市场情绪 (positive, neutral, negative)
-3. keyPoints: 关键分析点列表 (至少3点)
-4. recommendation: 投资建议
+3. keyPoints: 关键分析点列表 (至少5点)，包括对布林带和200日均线的分析
+4. recommendation: 投资建议，参考《专业投机原理》的趋势跟踪策略
 5. riskLevel: 风险水平 (low, medium, high)
 
 请确保返回的是有效的JSON格式。

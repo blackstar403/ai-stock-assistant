@@ -251,7 +251,7 @@ class TushareDataSource(DataSourceBase):
         try:
             # 获取最近100个交易日的数据
             end_date = datetime.now().strftime('%Y%m%d')
-            start_date = (datetime.now() - timedelta(days=150)).strftime('%Y%m%d')
+            start_date = (datetime.now() - timedelta(days=365)).strftime('%Y%m%d')
             
             df = self.api.daily(ts_code=symbol, start_date=start_date, end_date=end_date)
             

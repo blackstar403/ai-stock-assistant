@@ -24,7 +24,7 @@ async def analyze_with_all_modes(symbol: str, data_source: str = None):
     print(f"{'='*80}")
     
     # 使用三种不同的分析模式
-    modes = [ "rule", "ml", "llm"]
+    modes = [ "rule"]
     
     for mode in modes:
         print(f"\n{'-'*40}")
