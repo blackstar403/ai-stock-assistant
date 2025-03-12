@@ -52,12 +52,15 @@ class OpenAIService:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
-                max_tokens=1000,
+                max_tokens=4096,
                 response_format={"type": "json_object"}
             )
             
             # 解析响应
             content = response.choices[0].message.content
+            if not content:
+                content = response.choices[0].message.reasoning_content
+
             result = json.loads(content)
             
             return result
