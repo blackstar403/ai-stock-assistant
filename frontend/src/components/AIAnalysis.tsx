@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { getAIAnalysis } from '../lib/api';
 import { AIAnalysis as AIAnalysisType } from '../types';
-import { Bot, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Bot, TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react';
+import { Button } from './ui/button';
 
 interface AIAnalysisProps {
   symbol: string;
@@ -12,32 +13,38 @@ export default function AIAnalysis({ symbol }: AIAnalysisProps) {
   const [analysis, setAnalysis] = useState<AIAnalysisType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
-  useEffect(() => {
-    async function loadAnalysis() {
-      if (!symbol) return;
-      
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const response = await getAIAnalysis(symbol);
-        if (response.success && response.data) {
-          setAnalysis(response.data);
-        } else {
-          setError(response.error || '加载分析失败');
-          setAnalysis(null);
-        }
-      } catch (err) {
-        console.error('加载AI分析出错:', err);
-        setError('加载分析时出错');
-        setAnalysis(null);
-      } finally {
-        setLoading(false);
-      }
-    }
+  // 加载分析数据
+  const loadAnalysis = async (forceRefresh: boolean = false) => {
+    if (!symbol) return;
     
-    loadAnalysis();
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await getAIAnalysis(symbol, forceRefresh);
+      if (response.success && response.data) {
+        setAnalysis(response.data);
+        setHasLoaded(true);
+      } else {
+        setError(response.error || '加载分析失败');
+        setAnalysis(null);
+      }
+    } catch (err) {
+      console.error('加载AI分析出错:', err);
+      setError('加载分析时出错');
+      setAnalysis(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 当股票代码变化时，重置状态
+  useEffect(() => {
+    setAnalysis(null);
+    setError(null);
+    setHasLoaded(false);
   }, [symbol]);
 
   // 获取情绪图标
@@ -106,11 +113,40 @@ export default function AIAnalysis({ symbol }: AIAnalysisProps) {
         )}
         
         {error && (
-          <div className="py-4 text-red-500 text-center">{error}</div>
+          <div className="py-4 text-red-500 text-center">
+            {error}
+            <div className="mt-4">
+              <Button onClick={() => loadAnalysis(true)}>重试</Button>
+            </div>
+          </div>
+        )}
+        
+        {!loading && !error && !hasLoaded && (
+          <div className="py-8 text-center">
+            <p className="text-muted-foreground mb-4">
+              AI分析需要消耗较多资源，点击下方按钮获取分析结果
+            </p>
+            <Button onClick={() => loadAnalysis(false)}>
+              <Bot className="mr-2 h-4 w-4" />
+              获取AI分析
+            </Button>
+          </div>
         )}
         
         {!loading && !error && analysis && (
           <div className="space-y-4">
+            <div className="flex justify-end">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => loadAnalysis(true)}
+                className="text-xs"
+              >
+                <RefreshCw className="mr-1 h-3 w-3" />
+                刷新分析
+              </Button>
+            </div>
+            
             <div>
               <h3 className="font-medium mb-2">摘要</h3>
               <p className="text-muted-foreground">{analysis.summary}</p>

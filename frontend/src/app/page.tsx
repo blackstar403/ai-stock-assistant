@@ -6,8 +6,10 @@ import StockDetail from '../components/StockDetail';
 import StockChart from '../components/StockChart';
 import AIAnalysis from '../components/AIAnalysis';
 import SavedStocks from '../components/SavedStocks';
+import CacheControl from '../components/CacheControl';
 import { StockInfo } from '../types';
-import { ChartLine, Bot, Search } from 'lucide-react';
+import { ChartLine, Search, Settings } from 'lucide-react';
+import Link from 'next/link';
 
 export default function Home() {
   const [selectedStock, setSelectedStock] = useState<StockInfo | null>(null);
@@ -15,6 +17,11 @@ export default function Home() {
   // 处理选择股票
   const handleSelectStock = (stock: StockInfo) => {
     setSelectedStock(stock);
+    
+    const detailsElement = document.getElementById('stock-details-section');
+    if (detailsElement) {
+      detailsElement.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   // 处理从收藏夹选择股票
@@ -37,6 +44,13 @@ export default function Home() {
             <span>AI股票助理</span>
           </div>
           <div className="ml-auto flex items-center space-x-4">
+            <Link
+              href="/system"
+              className="flex items-center text-muted-foreground hover:text-foreground"
+            >
+              <Settings className="h-5 w-5 mr-1" />
+              <span>系统管理</span>
+            </Link>
             <a
               href="https://github.com/yourusername/ai-stock-assistant"
               target="_blank"
@@ -51,16 +65,23 @@ export default function Home() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-4">探索股票市场</h1>
-          <p className="text-muted-foreground mb-6">
-            搜索股票，查看实时数据，获取AI分析和建议
-          </p>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">探索股票市场</h1>
+              <p className="text-muted-foreground">
+                搜索股票，查看实时数据，获取AI分析和建议
+              </p>
+            </div>
+            <div>
+              <CacheControl />
+            </div>
+          </div>
           <StockSearch onSelectStock={handleSelectStock} />
         </div>
 
         {selectedStock ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-8">
+          <div id="stock-details-section" className="grid grid-cols-1 lg:grid-cols-3 gap-8 scroll-mt-8">
+            <div className="lg:col-span-2 space-y-8">              
               <StockDetail symbol={selectedStock.symbol} />
               <StockChart symbol={selectedStock.symbol} />
               <AIAnalysis symbol={selectedStock.symbol} />
@@ -74,10 +95,7 @@ export default function Home() {
             <div className="lg:col-span-2 flex items-center justify-center p-16 border border-dashed border-border rounded-lg">
               <div className="text-center">
                 <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h2 className="text-xl font-medium mb-2">搜索股票开始</h2>
-                <p className="text-muted-foreground">
-                  输入股票代码或名称，查看详细信息和AI分析
-                </p>
+                <h2 className="text-xl font-medium mb-2">搜索股票</h2>
               </div>
             </div>
             <div>

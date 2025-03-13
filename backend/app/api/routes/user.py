@@ -5,6 +5,7 @@ from typing import Optional
 from app.db.session import get_db
 from app.services.stock_service import StockService
 from app.schemas.stock import SavedStockCreate
+from app.utils.response import api_response
 
 router = APIRouter()
 
@@ -14,11 +15,7 @@ async def get_saved_stocks(
 ):
     """获取用户保存的股票列表"""
     saved_stocks = await StockService.get_saved_stocks(db)
-    
-    return {
-        "success": True,
-        "data": saved_stocks
-    }
+    return api_response(data=saved_stocks)
 
 @router.post("/saved-stocks", response_model=dict)
 async def save_stock(
@@ -33,14 +30,9 @@ async def save_stock(
     )
     
     if not success:
-        return {
-            "success": False,
-            "error": "保存股票失败"
-        }
+        return api_response(success=False, error="保存股票失败")
     
-    return {
-        "success": True
-    }
+    return api_response()
 
 @router.delete("/saved-stocks/{symbol}", response_model=dict)
 async def delete_saved_stock(
@@ -51,11 +43,6 @@ async def delete_saved_stock(
     success = await StockService.delete_saved_stock(db, symbol)
     
     if not success:
-        return {
-            "success": False,
-            "error": "删除股票失败"
-        }
+        return api_response(success=False, error="删除股票失败")
     
-    return {
-        "success": True
-    } 
+    return api_response() 

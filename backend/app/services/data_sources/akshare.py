@@ -17,6 +17,7 @@ class AKShareDataSource(DataSourceBase):
             ak.set_proxy(proxy=settings.AKSHARE_PROXY_URL)
     
     async def search_stocks(self, query: str) -> List[StockInfo]:
+        print(f"搜索股票: {query}")
         """搜索股票"""
         try:
             # 获取A股股票列表
@@ -93,7 +94,7 @@ class AKShareDataSource(DataSourceBase):
             market_cap = float(row['总市值']) if '总市值' in row else 0
             
             # 获取成交量（手转为股）
-            volume = int(row['成交量']) * 100 if '成交量' in row else 0
+            volume = int(float(row['成交量'])) * 100 if '成交量' in row and not pd.isna(row['成交量']) else 0
             
             stock_info = StockInfo(
                 symbol=symbol,
@@ -106,7 +107,7 @@ class AKShareDataSource(DataSourceBase):
                 marketCap=market_cap,
                 volume=volume
             )
-            
+            print(stock_info)
             return stock_info
         except Exception as e:
             print(f"获取股票信息时出错: {str(e)}")

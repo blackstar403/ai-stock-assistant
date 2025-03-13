@@ -119,4 +119,50 @@ class StockService:
         except Exception as e:
             db.rollback()
             print(f"删除已保存股票时出错: {str(e)}")
-            return False 
+            return False
+            
+    @staticmethod
+    async def update_stock_data(symbol: str = None, db: Session = None) -> Dict[str, Any]:
+        """更新股票数据
+        
+        如果指定了symbol，则只更新该股票的数据
+        否则更新所有已保存的股票数据
+        """
+        try:
+            if symbol:
+                # 直接从数据源获取最新数据
+                await StockService.get_stock_info(symbol)
+                await StockService.get_stock_price_history(symbol)
+                
+                return {"success": True, "data": {"message": f"已更新股票 {symbol} 的数据"}}
+            else:
+                # 如果没有提供数据库会话，则只返回成功消息
+                if db is None:
+                    return {"success": True, "data": {"message": "已触发更新所有股票数据的任务"}}
+                
+                # 从数据库获取所有保存的股票
+                try:
+                    stocks = db.query(Stock).all()
+                    updated_count = 0
+                    
+                    # 逐个更新股票数据
+                    for stock in stocks:
+                        try:
+                            await StockService.get_stock_info(stock.symbol)
+                            await StockService.get_stock_price_history(stock.symbol)
+                            updated_count += 1
+                        except Exception as e:
+                            print(f"更新股票 {stock.symbol} 数据时出错: {str(e)}")
+                    
+                    return {
+                        "success": True, 
+                        "data": {
+                            "message": f"已更新 {updated_count}/{len(stocks)} 个股票的数据"
+                        }
+                    }
+                except Exception as e:
+                    print(f"获取所有股票时出错: {str(e)}")
+                    return {"success": False, "error": f"获取所有股票时出错: {str(e)}"}
+        except Exception as e:
+            print(f"更新股票数据时出错: {str(e)}")
+            return {"success": False, "error": f"更新股票数据时出错: {str(e)}"} 

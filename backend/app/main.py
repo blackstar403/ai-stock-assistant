@@ -6,6 +6,7 @@ import os
 from app.api.api import api_router
 from app.core.config import settings
 from app.db.session import engine, Base
+from app.services.scheduler_service import SchedulerService
 
 # 创建数据库表
 Base.metadata.create_all(bind=engine)
@@ -34,6 +35,20 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+# 启动事件
+@app.on_event("startup")
+async def startup_event():
+    # 启动调度器
+    scheduler = SchedulerService()
+    scheduler.start()
+
+# 关闭事件
+@app.on_event("shutdown")
+async def shutdown_event():
+    # 停止调度器
+    scheduler = SchedulerService()
+    scheduler.stop()
 
 if __name__ == "__main__":
     # 获取端口，默认为 8000

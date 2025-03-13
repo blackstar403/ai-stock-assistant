@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { getStockInfo, saveStock } from '../lib/api';
+import { getStockInfo, saveStock, deleteSavedStock } from '../lib/api';
 import { StockInfo } from '../types';
-import { Bookmark, BookmarkCheck, BarChart3 } from 'lucide-react';
+import { Bookmark, BookmarkCheck, RefreshCw, TrendingUp, TrendingDown, Clock, Info, AlertCircle } from 'lucide-react';
+import { Skeleton } from './ui/skeleton';
+import { Badge } from './ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 
 interface StockDetailProps {
   symbol: string;
@@ -17,36 +20,53 @@ export default function StockDetail({ symbol }: StockDetailProps) {
   const [isSaved, setIsSaved] = useState(false);
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // 加载股票信息
-  useEffect(() => {
-    async function loadStockInfo() {
-      if (!symbol) return;
-      
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const response = await getStockInfo(symbol);
-        if (response.success && response.data) {
-          setStockInfo(response.data);
-        } else {
-          setError(response.error || '加载股票信息失败');
-          setStockInfo(null);
-        }
-      } catch (err) {
-        console.error('加载股票信息出错:', err);
-        setError('加载股票信息时出错');
-        setStockInfo(null);
-      } finally {
-        setLoading(false);
-      }
-    }
+  const loadStockInfo = async (forceRefresh: boolean = false) => {
+    if (!symbol) return;
     
+    if (forceRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+    
+    try {
+      const response = await getStockInfo(symbol, forceRefresh);
+      if (response.success && response.data) {
+        setStockInfo(response.data);
+        setLastUpdated(new Date());
+      } else {
+        setError(response.error || '加载股票信息失败');
+        setStockInfo(null);
+      }
+    } catch (err) {
+      console.error('加载股票信息出错:', err);
+      setError('加载股票信息时出错');
+      setStockInfo(null);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
     loadStockInfo();
+    const checkIfSaved = async () => {
+      try {
+        const savedStocks = JSON.parse(localStorage.getItem('savedStocks') || '[]');
+        console.log(savedStocks);
+        setIsSaved(savedStocks.some((s: any) => s.symbol === symbol));
+      } catch (err) {
+        console.error('检查收藏状态出错:', err);
+      }
+    };
+    checkIfSaved();
   }, [symbol]);
 
-  // 保存股票到收藏夹
   const handleSaveStock = async () => {
     if (!stockInfo) return;
     
@@ -55,6 +75,19 @@ export default function StockDetail({ symbol }: StockDetailProps) {
       const response = await saveStock(stockInfo.symbol, notes);
       if (response.success) {
         setIsSaved(true);
+        try {
+          const savedStocks = JSON.parse(localStorage.getItem('savedStocks') || '[]');
+          if (!savedStocks.some((s: any) => s.symbol === stockInfo.symbol)) {
+            savedStocks.push({
+              symbol: stockInfo.symbol,
+              name: stockInfo.name,
+              notes: notes
+            });
+            localStorage.setItem('savedStocks', JSON.stringify(savedStocks));
+          }
+        } catch (e) {
+          console.error('更新本地存储出错:', e);
+        }
       } else {
         setError(response.error || '保存股票失败');
       }
@@ -66,7 +99,34 @@ export default function StockDetail({ symbol }: StockDetailProps) {
     }
   };
 
-  // 格式化数字
+  // 取消收藏股票
+  const handleRemoveStock = async () => {
+    if (!stockInfo) return;
+    
+    setRemoving(true);
+    try {
+      const response = await deleteSavedStock(stockInfo.symbol);
+      if (response.success) {
+        setIsSaved(false);
+        setNotes('');
+        try {
+          const savedStocks = JSON.parse(localStorage.getItem('savedStocks') || '[]');
+          const updatedStocks = savedStocks.filter((s: any) => s.symbol !== stockInfo.symbol);
+          localStorage.setItem('savedStocks', JSON.stringify(updatedStocks));
+        } catch (e) {
+          console.error('更新本地存储出错:', e);
+        }
+      } else {
+        setError(response.error || '取消收藏失败');
+      }
+    } catch (err) {
+      console.error('取消收藏出错:', err);
+      setError('取消收藏时出错');
+    } finally {
+      setRemoving(false);
+    }
+  };
+
   const formatNumber = (num: number | undefined, decimals = 2) => {
     if (num === undefined) return '-';
     return num.toLocaleString(undefined, {
@@ -75,7 +135,6 @@ export default function StockDetail({ symbol }: StockDetailProps) {
     });
   };
 
-  // 格式化市值
   const formatMarketCap = (marketCap: number | undefined) => {
     if (marketCap === undefined) return '-';
     
@@ -90,41 +149,72 @@ export default function StockDetail({ symbol }: StockDetailProps) {
     return formatNumber(marketCap, 0);
   };
 
+  // 行业标签数据
+  const industryTags = ['科技', '互联网', '软件服务'];
+
   return (
-    <Card className="w-full">
+    <Card className="w-full shadow-sm">
       {loading && (
-        <CardContent className="flex justify-center items-center py-16">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <CardContent className="p-3">
+          <div className="flex justify-between">
+            <Skeleton className="h-7 w-28" />
+            <Skeleton className="h-7 w-20" />
+          </div>
+          <div className="grid grid-cols-4 gap-3 mt-3">
+            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-full" />
+          </div>
         </CardContent>
       )}
       
       {error && (
-        <CardContent className="py-8 text-red-500 text-center">{error}</CardContent>
+        <CardContent className="p-3 text-center">
+          <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-3" />
+          <div className="text-red-500 font-medium mb-2">{error}</div>
+          <Button 
+            onClick={() => loadStockInfo(true)} 
+            variant="outline"
+            size="sm"
+            className="mx-auto"
+          >
+            <RefreshCw className="h-4 w-4 mr-1" />
+            重试
+          </Button>
+        </CardContent>
       )}
       
       {!loading && !error && stockInfo && (
-        <>
-          <CardHeader className="flex flex-row items-start justify-between">
+        <CardContent className="p-3">
+          <div className="flex justify-between items-start mb-3 pb-2 border-b border-border">
             <div>
               <div className="flex items-center">
-                <CardTitle className="text-2xl">{stockInfo.symbol}</CardTitle>
-                <span className="ml-2 text-muted-foreground">
-                  {stockInfo.name}
-                </span>
+                <span className="text-lg font-semibold">{stockInfo.symbol}</span>
+                {stockInfo.marketStatus && (
+                  <Badge variant={stockInfo.marketStatus === 'open' ? 'success' : 'secondary'} className="ml-2 text-xs">
+                    {stockInfo.marketStatus === 'open' ? '交易中' : '已收盘'}
+                  </Badge>
+                )}
               </div>
-              <div className="text-sm text-muted-foreground mt-1">
-                {stockInfo.exchange} · {stockInfo.currency}
+              <div className="text-sm mt-1">{stockInfo.name}</div>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {industryTags.map((tag, index) => (
+                  <Badge key={index} variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                    {tag}
+                  </Badge>
+                ))}
               </div>
             </div>
+            
             <div className="text-right">
-              {stockInfo.price !== undefined && (
-                <div className="text-2xl font-bold">
-                  {formatNumber(stockInfo.price)}
-                </div>
-              )}
+              <div className="text-xl font-bold">
+                {stockInfo.price !== undefined ? formatNumber(stockInfo.price) : '-'}
+              </div>
+              
               {stockInfo.change !== undefined && stockInfo.changePercent !== undefined && (
                 <div
-                  className={`text-sm font-medium ${
+                  className={`text-sm ${
                     stockInfo.change > 0
                       ? 'text-green-500'
                       : stockInfo.change < 0
@@ -132,62 +222,104 @@ export default function StockDetail({ symbol }: StockDetailProps) {
                       : 'text-muted-foreground'
                   }`}
                 >
+                  {stockInfo.change > 0 ? (
+                    <TrendingUp className="h-3 w-3 inline mr-1" />
+                  ) : stockInfo.change < 0 ? (
+                    <TrendingDown className="h-3 w-3 inline mr-1" />
+                  ) : null}
                   {stockInfo.change > 0 ? '+' : ''}
                   {formatNumber(stockInfo.change)} ({stockInfo.changePercent > 0 ? '+' : ''}
                   {formatNumber(stockInfo.changePercent)}%)
                 </div>
               )}
-            </div>
-          </CardHeader>
-          
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <div className="space-y-1">
-                <div className="text-sm text-muted-foreground">市值</div>
-                <div className="font-medium">
-                  {formatMarketCap(stockInfo.marketCap)}
-                </div>
-              </div>
-              <div className="space-y-1">
-                <div className="text-sm text-muted-foreground">成交量</div>
-                <div className="font-medium">
-                  {stockInfo.volume ? formatNumber(stockInfo.volume, 0) : '-'}
-                </div>
-              </div>
-            </div>
-            
-            <div className="pt-4 border-t border-border">
-              <div className="flex items-center mb-2">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                <h3 className="font-medium">添加到收藏</h3>
-              </div>
-              <div className="space-y-2">
-                <Input
-                  placeholder="添加笔记（可选）"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-                <Button
-                  onClick={handleSaveStock}
-                  className="w-full"
-                  isLoading={savingNotes}
-                  disabled={isSaved}
+              
+              <div className="flex items-center justify-end mt-1 text-xs text-muted-foreground">
+                {lastUpdated && (
+                  <span className="mr-2">
+                    <Clock className="h-3 w-3 inline mr-1" />
+                    {lastUpdated.toLocaleTimeString()}
+                  </span>
+                )}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => loadStockInfo(true)}
+                  disabled={refreshing}
+                  className="h-6 px-1"
                 >
-                  {!savingNotes && (
-                    <>
-                      {isSaved ? (
-                        <BookmarkCheck className="h-4 w-4 mr-2" />
-                      ) : (
-                        <Bookmark className="h-4 w-4 mr-2" />
-                      )}
-                    </>
-                  )}
-                  {isSaved ? '已收藏' : '收藏股票'}
+                  <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
                 </Button>
               </div>
             </div>
-          </CardContent>
-        </>
+          </div>
+          
+          <TooltipProvider>
+            <div className="grid grid-cols-4 gap-2 mb-3">
+              <div className="bg-slate-50 rounded p-2">
+                <div className="text-xs text-muted-foreground">市值</div>
+                <div className="font-medium text-sm">
+                  {formatMarketCap(stockInfo.marketCap)}
+                </div>
+              </div>
+              
+              <div className="bg-slate-50 rounded p-2">
+                <div className="text-xs text-muted-foreground">成交量</div>
+                <div className="font-medium text-sm">
+                  {stockInfo.volume ? formatNumber(stockInfo.volume, 0) : '-'}
+                </div>
+              </div>
+              
+              {stockInfo.pe && (
+                <div className="bg-slate-50 rounded p-2">
+                  <div className="text-xs text-muted-foreground">市盈率</div>
+                  <div className="font-medium text-sm">
+                    {formatNumber(stockInfo.pe)}
+                  </div>
+                </div>
+              )}
+              
+              {stockInfo.dividend && (
+                <div className="bg-slate-50 rounded p-2">
+                  <div className="text-xs text-muted-foreground">股息率</div>
+                  <div className="font-medium text-sm">
+                    {formatNumber(stockInfo.dividend)}%
+                  </div>
+                </div>
+              )}
+            </div>
+          </TooltipProvider>
+          
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="添加笔记（可选）"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              disabled={isSaved}
+              className="flex-1 h-8 text-sm"
+            />
+            {isSaved ? (
+              <Button
+                onClick={handleRemoveStock}
+                className="h-8 min-w-[80px] px-2 bg-red-500 hover:bg-red-600"
+                disabled={removing}
+                size="sm"
+              >
+                {!removing && <BookmarkCheck className="h-3 w-3 mr-1" />}
+                <span className="text-xs whitespace-nowrap">{removing ? '取消中...' : '取消收藏'}</span>
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSaveStock}
+                className="h-8 min-w-[80px] px-2"
+                disabled={savingNotes}
+                size="sm"
+              >
+                {!savingNotes && <Bookmark className="h-3 w-3 mr-1" />}
+                <span className="text-xs whitespace-nowrap">{savingNotes ? '保存中...' : '收藏'}</span>
+              </Button>
+            )}
+          </div>
+        </CardContent>
       )}
     </Card>
   );

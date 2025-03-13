@@ -57,6 +57,9 @@ class SavedStock(BaseModel):
     
     class Config:
         from_attributes = True
+        json_encoders = {
+            datetime: lambda dt: dt.isoformat()  # 将datetime序列化为ISO格式字符串
+        }
 
 # API响应
 class ApiResponse(BaseModel):

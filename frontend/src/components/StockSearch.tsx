@@ -28,10 +28,12 @@ export default function StockSearch({ onSelectStock }: StockSearchProps) {
         setShowResults(true);
       } else {
         setResults([]);
+        setShowResults(true);
       }
     } catch (error) {
       console.error('搜索出错:', error);
       setResults([]);
+      setShowResults(true);
     } finally {
       setLoading(false);
     }
@@ -51,13 +53,6 @@ export default function StockSearch({ onSelectStock }: StockSearchProps) {
     };
   }, []);
 
-  // 处理按回车键搜索
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
-  };
-
   // 处理选择股票
   const handleSelectStock = (stock: StockInfo) => {
     onSelectStock(stock);
@@ -72,12 +67,11 @@ export default function StockSearch({ onSelectStock }: StockSearchProps) {
           placeholder="输入股票代码或名称搜索..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
           className="flex-1"
         />
-        <Button onClick={handleSearch} isLoading={loading}>
+        <Button onClick={handleSearch} isLoading={loading} className="min-w-[80px]">
           {!loading && <Search className="h-4 w-4 mr-2" />}
-          Search
+          <span className="whitespace-nowrap">搜索</span>
         </Button>
       </div>
       

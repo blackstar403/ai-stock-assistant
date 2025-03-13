@@ -4,6 +4,7 @@ from typing import Optional
 
 from app.db.session import get_db
 from app.services.ai_service import AIService
+from app.utils.response import api_response
 
 router = APIRouter()
 
@@ -17,12 +18,6 @@ async def analyze_stock(
     analysis = await AIService.analyze_stock(symbol, data_source)
     
     if not analysis:
-        return {
-            "success": False,
-            "error": "无法生成股票分析"
-        }
+        return api_response(success=False, error="无法生成股票分析")
     
-    return {
-        "success": True,
-        "data": analysis
-    } 
+    return api_response(data=analysis) 
