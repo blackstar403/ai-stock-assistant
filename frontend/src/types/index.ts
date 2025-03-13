@@ -37,6 +37,7 @@ export interface AIAnalysis {
   keyPoints: string[];
   recommendation: string;
   riskLevel: 'low' | 'medium' | 'high';
+  analysisType?: 'rule' | 'ml' | 'llm';
 }
 
 // 用户保存的股票

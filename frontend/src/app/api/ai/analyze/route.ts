@@ -14,6 +14,7 @@ const mockAnalyses: Record<string, AIAnalysis> = {
     ],
     recommendation: '考虑长期持有，短期可能有小幅波动',
     riskLevel: 'low',
+    analysisType: 'llm',
   },
   'MSFT': {
     summary: '微软云业务表现强劲，AI集成产品线获得市场认可，整体增长前景良好。',
@@ -26,6 +27,7 @@ const mockAnalyses: Record<string, AIAnalysis> = {
     ],
     recommendation: '建议增持，长期成长性佳',
     riskLevel: 'low',
+    analysisType: 'llm',
   },
   'GOOGL': {
     summary: '谷歌广告业务面临一定压力，但云业务和AI发展迅速，整体前景稳定。',
@@ -38,6 +40,7 @@ const mockAnalyses: Record<string, AIAnalysis> = {
     ],
     recommendation: '建议持有，关注AI业务发展',
     riskLevel: 'medium',
+    analysisType: 'llm',
   },
   'AMZN': {
     summary: '亚马逊电商业务增长稳定，AWS云服务保持领先，物流效率提升。',
@@ -50,6 +53,7 @@ const mockAnalyses: Record<string, AIAnalysis> = {
     ],
     recommendation: '建议买入，长期增长潜力大',
     riskLevel: 'low',
+    analysisType: 'llm',
   },
   'TSLA': {
     summary: '特斯拉面临激烈的市场竞争和利润率压力，但技术创新能力仍然领先。',
@@ -62,6 +66,7 @@ const mockAnalyses: Record<string, AIAnalysis> = {
     ],
     recommendation: '谨慎持有，关注竞争格局变化',
     riskLevel: 'high',
+    analysisType: 'llm',
   },
   'BABA': {
     summary: '阿里巴巴国内电商业务稳定，云业务增长，但面临监管和竞争压力。',
@@ -74,6 +79,7 @@ const mockAnalyses: Record<string, AIAnalysis> = {
     ],
     recommendation: '可考虑逢低买入，长期价值显现',
     riskLevel: 'medium',
+    analysisType: 'llm',
   },
   '600519': {
     summary: '贵州茅台业绩稳健增长，高端白酒市场地位稳固，品牌价值持续提升。',
@@ -86,6 +92,7 @@ const mockAnalyses: Record<string, AIAnalysis> = {
     ],
     recommendation: '长期持有，防御性较强',
     riskLevel: 'low',
+    analysisType: 'llm',
   },
   '000858': {
     summary: '五粮液在次高端市场竞争力增强，产能扩张顺利，但面临行业增速放缓挑战。',
@@ -98,6 +105,7 @@ const mockAnalyses: Record<string, AIAnalysis> = {
     ],
     recommendation: '可适量配置，关注消费趋势变化',
     riskLevel: 'medium',
+    analysisType: 'llm',
   },
 };
 
@@ -113,17 +121,51 @@ const defaultAnalysis: AIAnalysis = {
   ],
   recommendation: '建议收集更多信息后再做决策',
   riskLevel: 'medium',
+  analysisType: 'llm',
 };
+
+// 模拟不同分析类型的结果
+function getAnalysisByType(symbol: string, type: string): AIAnalysis {
+  // 获取基础分析
+  const baseAnalysis = mockAnalyses[symbol] || defaultAnalysis;
+  
+  // 根据分析类型调整结果
+  switch (type) {
+    case 'rule':
+      return {
+        ...baseAnalysis,
+        summary: `[规则分析] ${baseAnalysis.summary}`,
+        keyPoints: baseAnalysis.keyPoints.map(point => `[规则] ${point}`),
+        recommendation: `[规则建议] ${baseAnalysis.recommendation}`,
+        analysisType: 'rule',
+      };
+    case 'ml':
+      return {
+        ...baseAnalysis,
+        summary: `[机器学习] ${baseAnalysis.summary}`,
+        keyPoints: baseAnalysis.keyPoints.map(point => `[ML] ${point}`),
+        recommendation: `[ML建议] ${baseAnalysis.recommendation}`,
+        analysisType: 'ml',
+      };
+    case 'llm':
+    default:
+      return {
+        ...baseAnalysis,
+        analysisType: 'llm',
+      };
+  }
+}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const symbol = searchParams.get('symbol')?.toUpperCase() || '';
+  const analysisType = searchParams.get('type') || 'llm';
   
   // 模拟网络延迟和AI处理时间
   await new Promise((resolve) => setTimeout(resolve, 1500));
   
   // 获取分析结果
-  const analysis = mockAnalyses[symbol] || defaultAnalysis;
+  const analysis = getAnalysisByType(symbol, analysisType);
   
   return NextResponse.json({
     success: true,

@@ -107,7 +107,6 @@ class AKShareDataSource(DataSourceBase):
                 marketCap=market_cap,
                 volume=volume
             )
-            print(stock_info)
             return stock_info
         except Exception as e:
             print(f"获取股票信息时出错: {str(e)}")

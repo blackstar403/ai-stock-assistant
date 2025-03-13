@@ -4,13 +4,24 @@ import React, { useState } from 'react';
 import IndexedDBCacheManager from '../../components/IndexedDBCacheManager';
 import TaskManager from '../../components/TaskManager';
 import DataUpdater from '../../components/DataUpdater';
+import { Button } from '../../components/ui/button';
+import Link from 'next/link';
+import { Home, ArrowLeft } from 'lucide-react';
 
 const SystemPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'cache' | 'tasks' | 'data'>('cache');
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">系统管理</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">系统管理</h1>
+        <Link href="/">
+          <Button variant="outline" size="sm" className="flex items-center">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            返回主页
+          </Button>
+        </Link>
+      </div>
       
       {/* 标签页导航 */}
       <div className="border-b border-gray-200 mb-6">

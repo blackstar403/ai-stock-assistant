@@ -79,12 +79,13 @@ async def get_stock_price_history(
 async def get_stock_analysis(
     symbol: str,
     data_source: Optional[str] = Query(None, description="数据源: alphavantage, tushare, akshare"),
+    analysis_type: Optional[str] = Query(None, description="分析类型: rule, ml, llm"),
     db: Session = Depends(get_db)
 ):
     """获取股票的AI分析"""
     from app.services.ai_service import AIService
     
-    analysis = await AIService.analyze_stock(symbol, data_source)
+    analysis = await AIService.analyze_stock(symbol, data_source, analysis_type)
     if not analysis:
         return api_response(success=False, error="无法生成股票分析")
     

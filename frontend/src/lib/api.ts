@@ -187,8 +187,12 @@ export async function getStockPriceHistory(
 }
 
 // 获取AI分析
-export async function getAIAnalysis(symbol: string, forceRefresh: boolean = false): Promise<ApiResponse<AIAnalysis>> {
-  const cacheKey = `getAIAnalysis:${symbol}`;
+export async function getAIAnalysis(
+  symbol: string, 
+  forceRefresh: boolean = false,
+  analysisType: 'rule' | 'ml' | 'llm' = 'llm'
+): Promise<ApiResponse<AIAnalysis>> {
+  const cacheKey = `getAIAnalysis:${symbol}:${analysisType}`;
   
   // 如果不是强制刷新，尝试从缓存获取
   if (!forceRefresh) {
@@ -199,7 +203,9 @@ export async function getAIAnalysis(symbol: string, forceRefresh: boolean = fals
   }
   
   try {
-    const response = await api.get<{success: boolean, data?: AIAnalysis, error?: string}>(`/ai/analyze?symbol=${encodeURIComponent(symbol)}`);
+    const response = await api.get<{success: boolean, data?: AIAnalysis, error?: string}>(
+      `/ai/analyze?symbol=${encodeURIComponent(symbol)}&analysis_type=${analysisType}`
+    );
     
     // 直接返回后端的响应格式
     if (response.data && 'success' in response.data) {

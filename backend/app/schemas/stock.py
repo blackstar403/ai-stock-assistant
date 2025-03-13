@@ -43,6 +43,7 @@ class AIAnalysis(BaseModel):
     keyPoints: List[str]
     recommendation: str
     riskLevel: str = Field(..., description="low, medium, high")
+    analysisType: Optional[str] = Field(None, description="rule, ml, llm")
 
 # 用户保存的股票
 class SavedStockCreate(BaseModel):

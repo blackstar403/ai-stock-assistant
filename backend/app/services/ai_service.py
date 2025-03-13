@@ -48,7 +48,7 @@ class AIService:
             # 如果未指定分析模式，使用默认模式
             if analysis_mode is None:
                 analysis_mode = settings.DEFAULT_ANALYSIS_MODE
-            
+
             # 如果分析模式无效，使用默认模式
             if analysis_mode not in AIService._analysis_modes:
                 print(f"警告: 无效的分析模式 '{analysis_mode}'，使用默认模式 '{settings.DEFAULT_ANALYSIS_MODE}'")
@@ -58,29 +58,36 @@ class AIService:
             ds = DataSourceFactory.get_data_source(data_source)
             
             # 获取股票历史数据
+            print(f"获取股票历史数据: {symbol}")
             historical_data = await ds.get_historical_data(symbol)
             if historical_data is None:
                 return None
             
             # 获取股票信息
+            print(f"获取股票信息: {symbol}")
             stock_info = await ds.get_stock_info(symbol)
             if stock_info is None:
                 return None
             
             # 获取公司基本面数据
+            print(f"获取公司基本面数据: {symbol}")
             fundamentals = await ds.get_fundamentals(symbol)
             
             # 获取新闻情绪
+            print(f"获取新闻情绪: {symbol}")
             news_sentiment = await ds.get_news_sentiment(symbol)
             
             # 获取板块联动性和概念涨跌分布
+            print(f"获取板块联动性和概念涨跌分布: {symbol}")
             sector_linkage = await ds.get_sector_linkage(symbol)
             concept_distribution = await ds.get_concept_distribution(symbol)
             
             # 计算技术指标
+            print(f"计算技术指标: {symbol}")
             technical_indicators = AIService._calculate_technical_indicators(historical_data)
             
             # 根据分析模式调用相应的分析方法
+            print(f"分析模式: {analysis_mode}")
             method_name = AIService._analysis_modes[analysis_mode]
             method = getattr(AIService, method_name)
             
@@ -325,25 +332,25 @@ class AIService:
                 if policy_bullish and sector_bullish:
                     recommendation = "积极买入。价格处于长期上升趋势，且短期可能超卖，政策共振较强且板块地位突出，这是较好的买入时机。"
                 elif policy_bullish:
-                    recommendation = "积极买入。价格处于长期上升趋势，且短期可能超卖，政策共振较强，可根据专业投机原理》的趋势跟踪策略，这是较好的买入时机。"
+                    recommendation = "积极买入。价格处于长期上升趋势，且短期可能超卖，政策共振较强，可根据《专业投机原理》的趋势跟踪策略，这是较好的买入时机。"
                 elif sector_bullish:
                     recommendation = "考虑买入。价格处于长期上升趋势，且短期可能超卖，在板块中具有较强带动性，可适量买入。"
                 else:
-                    recommendation = "考虑买入。价格处于长期上升趋势，且短期可能超卖，可根据专业投机原理》的趋势跟踪策略，这是较好的买入时机。"
+                    recommendation = "考虑买入。价格处于长期上升趋势，且短期可能超卖，可根据《专业投机原理》的趋势跟踪策略，这是较好的买入时机。"
             elif tight_bands:
                 if sector_driving_force > 0.7:
                     recommendation = "密切关注。布林带收缩，可能即将突破，在长期上升趋势中且具有较强板块带动性，突破方向可能向上，可设置突破买入策略。"
                 else:
-                    recommendation = "密切关注。布林带收缩，可能即将突破，在长期上升趋势中，突破方向可能向上，可根据专业投机原理》的趋势跟踪策略，可设置突破买入策略。"
+                    recommendation = "密切关注。布林带收缩，可能即将突破，在长期上升趋势中，突破方向可能向上，可根据《专业投机原理》的趋势跟踪策略，可设置突破买入策略。"
             else:
                 if policy_bullish and sector_bullish:
                     recommendation = "持有或适量买入。价格处于长期上升趋势，政策共振较强且板块地位突出，应跟随趋势操作。"
                 elif policy_bullish:
-                    recommendation = "持有或适量买入。价格处于长期上升趋势，政策共振较强，可根据专业投机原理》的趋势跟踪策略，应跟随趋势操作。"
+                    recommendation = "持有或适量买入。价格处于长期上升趋势，政策共振较强，可根据《专业投机原理》的趋势跟踪策略，应跟随趋势操作。"
                 elif sector_bullish:
                     recommendation = "持有或小幅买入。价格处于长期上升趋势，在板块中具有较强地位，可跟随趋势操作。"
                 else:
-                    recommendation = "持有或小幅买入。价格处于长期上升趋势，可根据专业投机原理》的趋势跟踪策略，应跟随趋势操作。"
+                    recommendation = "持有或小幅买入。价格处于长期上升趋势，可根据《专业投机原理》的趋势跟踪策略，应跟随趋势操作。"
         else:
             # 长期下降趋势
             if overbought:
@@ -355,25 +362,25 @@ class AIService:
                 if policy_bullish and sector_bullish:
                     recommendation = "观望或试探性买入。价格处于长期下降趋势，但短期可能超卖，且政策共振较强和板块地位突出，可小仓位试探。"
                 elif policy_bullish:
-                    recommendation = "观望或试探性买入。价格处于长期下降趋势，但短期可能超卖，且政策共振较强，可根据专业投机原理》的趋势跟踪策略，可小仓位试探。"
+                    recommendation = "观望或试探性买入。价格处于长期下降趋势，但短期可能超卖，且政策共振较强，可根据《专业投机原理》的趋势跟踪策略，可小仓位试探。"
                 elif sector_bullish:
                     recommendation = "观望或小幅试探。价格处于长期下降趋势，虽短期可能超卖，但在板块中具有一定地位，可少量试探。"
                 else:
-                    recommendation = "观望或小幅试探。价格处于长期下降趋势，虽短期可能超卖，但可根据专业投机原理》的趋势跟踪策略，不宜大量买入逆势品种。"
+                    recommendation = "观望或小幅试探。价格处于长期下降趋势，虽短期可能超卖，但可根据《专业投机原理》的趋势跟踪策略，不宜大量买入逆势品种。"
             elif tight_bands:
                 if sector_driving_force > 0.7:
                     recommendation = "密切关注。布林带收缩，可能即将突破，虽处于长期下降趋势，但在板块中具有较强带动性，可能出现独立行情。"
                 else:
-                    recommendation = "密切关注。布林带收缩，可能即将突破，在长期下降趋势中，突破方向可能向下，可根据专业投机原理》的趋势跟踪策略，应保持谨慎。"
+                    recommendation = "密切关注。布林带收缩，可能即将突破，在长期下降趋势中，突破方向可能向下，可根据《专业投机原理》的趋势跟踪策略，应保持谨慎。"
             else:
                 if policy_bullish and sector_bullish:
                     recommendation = "观望。价格处于长期下降趋势，但政策共振较强且板块地位突出，可等待趋势转变信号。"
                 elif policy_bullish:
-                    recommendation = "观望。价格处于长期下降趋势，但政策共振较强，可根据专业投机原理》的趋势跟踪策略，可等待趋势转变信号。"
+                    recommendation = "观望。价格处于长期下降趋势，但政策共振较强，可根据《专业投机原理》的趋势跟踪策略，可等待趋势转变信号。"
                 elif sector_bullish:
                     recommendation = "观望。价格处于长期下降趋势，但在板块中具有一定地位，可等待板块整体转强信号。"
                 else:
-                    recommendation = "观望或减仓。价格处于长期下降趋势，可根据专业投机原理》的趋势跟踪策略，应避免逆势操作。"
+                    recommendation = "观望或减仓。价格处于长期下降趋势，可根据《专业投机原理》的趋势跟踪策略，应避免逆势操作。"
         
         # 生成摘要
         company_name = fundamentals.get('Name', symbol)
@@ -416,7 +423,8 @@ class AIService:
             sentiment=sentiment,
             keyPoints=key_points,
             recommendation=recommendation,
-            riskLevel=risk_level
+            riskLevel=risk_level,
+            analysisType="rule"
         )
     
     @staticmethod
@@ -455,6 +463,8 @@ class AIService:
                 technical_indicators
             )
         
+        # 添加分析类型
+        analysis.analysisType = "ml"
         return analysis
     
     @staticmethod
@@ -548,7 +558,8 @@ class AIService:
                 sentiment=result.get('sentiment', 'neutral'),
                 keyPoints=result.get('keyPoints', ['无法生成关键点']),
                 recommendation=result.get('recommendation', '无法提供建议'),
-                riskLevel=result.get('riskLevel', 'medium')
+                riskLevel=result.get('riskLevel', 'medium'),
+                analysisType="llm"
             )
             
             return analysis

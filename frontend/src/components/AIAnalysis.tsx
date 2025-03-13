@@ -14,6 +14,7 @@ export default function AIAnalysis({ symbol }: AIAnalysisProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [analysisType, setAnalysisType] = useState<'rule' | 'ml' | 'llm'>('llm');
 
   // 加载分析数据
   const loadAnalysis = async (forceRefresh: boolean = false) => {
@@ -23,7 +24,7 @@ export default function AIAnalysis({ symbol }: AIAnalysisProps) {
     setError(null);
     
     try {
-      const response = await getAIAnalysis(symbol, forceRefresh);
+      const response = await getAIAnalysis(symbol, forceRefresh, analysisType);
       if (response.success && response.data) {
         setAnalysis(response.data);
         setHasLoaded(true);
@@ -40,12 +41,12 @@ export default function AIAnalysis({ symbol }: AIAnalysisProps) {
     }
   };
 
-  // 当股票代码变化时，重置状态
+  // 当股票代码或分析类型变化时，重置状态
   useEffect(() => {
     setAnalysis(null);
     setError(null);
     setHasLoaded(false);
-  }, [symbol]);
+  }, [symbol, analysisType]);
 
   // 获取情绪图标
   const getSentimentIcon = () => {
@@ -73,6 +74,13 @@ export default function AIAnalysis({ symbol }: AIAnalysisProps) {
       default:
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
     }
+  };
+
+  // 分析类型按钮样式
+  const getAnalysisTypeButtonStyle = (type: 'rule' | 'ml' | 'llm') => {
+    return type === analysisType
+      ? 'bg-primary text-primary-foreground'
+      : 'bg-secondary/30 text-secondary-foreground hover:bg-secondary/50';
   };
 
   return (
@@ -106,6 +114,31 @@ export default function AIAnalysis({ symbol }: AIAnalysisProps) {
         )}
       </CardHeader>
       <CardContent>
+        {/* 分析类型选择器 */}
+        <div className="flex mb-4 space-x-2 border-b pb-4">
+          <div className="text-sm font-medium mr-2 flex items-center">分析模式:</div>
+          <div className="flex rounded-md overflow-hidden border">
+            <button
+              className={`px-3 py-1 text-xs font-medium ${getAnalysisTypeButtonStyle('rule')}`}
+              onClick={() => setAnalysisType('rule')}
+            >
+              规则分析
+            </button>
+            <button
+              className={`px-3 py-1 text-xs font-medium border-l border-r ${getAnalysisTypeButtonStyle('ml')}`}
+              onClick={() => setAnalysisType('ml')}
+            >
+              机器学习
+            </button>
+            <button
+              className={`px-3 py-1 text-xs font-medium ${getAnalysisTypeButtonStyle('llm')}`}
+              onClick={() => setAnalysisType('llm')}
+            >
+              大语言模型
+            </button>
+          </div>
+        </div>
+
         {loading && (
           <div className="flex justify-center items-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -135,7 +168,15 @@ export default function AIAnalysis({ symbol }: AIAnalysisProps) {
         
         {!loading && !error && analysis && (
           <div className="space-y-4">
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center">
+              {analysis.analysisType && (
+                <div className="text-xs text-muted-foreground">
+                  分析方式: {
+                    analysis.analysisType === 'rule' ? '规则分析' :
+                    analysis.analysisType === 'ml' ? '机器学习' : '大语言模型'
+                  }
+                </div>
+              )}
               <Button 
                 variant="outline" 
                 size="sm" 
