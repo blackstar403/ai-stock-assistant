@@ -2,6 +2,12 @@
 const nextConfig = {
   /* config options here */
   output: 'standalone',
+
+  experimental: {
+    // 设置代理超时为120秒
+    proxyTimeout: 120000,
+  },
+  
   async rewrites() {
     // 根据环境变量决定使用哪个目标URL
     // 注意：在某些环境中process.env.NODE_ENV可能为undefined
