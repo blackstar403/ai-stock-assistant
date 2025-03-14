@@ -1,5 +1,5 @@
 # 构建阶段
-FROM node:20-alpine as build
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -15,20 +15,33 @@ RUN npm install
 # 复制源代码
 COPY . .
 
-# 构建应用
+# 构建应用 - 使用Next.js的standalone输出
 RUN npm run build
 
 # 生产阶段
-FROM nginx:alpine
+FROM node:20-alpine AS runner
+WORKDIR /app
 
-# 复制构建产物到Nginx服务目录
-COPY --from=build /app/build /usr/share/nginx/html
+ENV NODE_ENV production
 
-# 复制Nginx配置
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# 添加非root用户
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
-# 暴露端口
-EXPOSE 80
+# 复制必要文件
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
-# 启动Nginx
-CMD ["nginx", "-g", "daemon off;"] 
+# 设置正确的权限
+RUN chown -R nextjs:nodejs /app
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT 3000
+ENV HOSTNAME "0.0.0.0"
+
+# 启动Next.js
+CMD ["node", "server.js"] 
