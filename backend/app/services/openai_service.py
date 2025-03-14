@@ -48,7 +48,7 @@ class OpenAIService:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "你是一位专业的股票分析师，擅长分析股票数据并提供投资建议。"},
+                    {"role": "system", "content": "你是一位专业的股票分析师，精通《专业投机原理》，擅长分析股票数据并提供投资建议。"},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
