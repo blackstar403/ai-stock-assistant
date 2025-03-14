@@ -86,9 +86,9 @@ class AKShareDataSource(DataSourceBase):
             exchange = "上海证券交易所" if market == "SH" else "深圳证券交易所"
             
             # 计算涨跌幅
-            price = float(row['最新价'])
-            change = float(row['涨跌额'])
-            change_percent = float(row['涨跌幅'])
+            price = float(row['最新价']) if not pd.isna(row['最新价']) else 0.0
+            change = float(row['涨跌额']) if not pd.isna(row['涨跌额']) else 0.0
+            change_percent = float(row['涨跌幅']) if not pd.isna(row['涨跌幅']) else 0.0
             
             # 获取市值（亿元转为元）
             market_cap = float(row['总市值']) if '总市值' in row else 0
