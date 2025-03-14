@@ -3,7 +3,7 @@ import { StockPriceHistory, StockPricePoint } from '../../../../../types';
 
 // 生成模拟历史数据
 function generateMockHistoryData(
-  symbol: string,
+  _symbol: string,
   days: number,
   startPrice: number
 ): StockPricePoint[] {
@@ -55,11 +55,11 @@ const mockPriceHistories: Record<string, { startPrice: number }> = {
 };
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { symbol: string } }
-) {
-  const symbol = params.symbol.toUpperCase();
-  const searchParams = request.nextUrl.searchParams;
+  request: NextRequest
+): Promise<Response> {
+  const { pathname } = new URL(request.url);
+  const symbol = pathname.split('/').pop()?.toUpperCase() || '';
+  const searchParams = new URL(request.url).searchParams;
   const interval = searchParams.get('interval') || 'daily';
   const range = searchParams.get('range') || '1m';
   

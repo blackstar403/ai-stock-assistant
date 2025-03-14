@@ -5,6 +5,7 @@ import React from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '../../components/ui/button';
+import Image from 'next/image';
 
 export default function AboutPage() {
   return (
@@ -52,7 +53,13 @@ export default function AboutPage() {
         <div className="flex flex-col items-center justify-center bg-card p-8 rounded-lg border border-border">
           <h2 className="text-xl font-semibold mb-6">关注我们的公众号</h2>
           <div className="bg-white p-3 rounded-md shadow-md mb-4">
-            <img src="/qrcode.jpg" alt="AlphaBot公众号" className="w-48 h-48" />
+            <Image 
+              src="/qrcode.jpg" 
+              alt="AlphaBot公众号" 
+              width={192} 
+              height={192}
+              className="w-48 h-48"
+            />
           </div>
           <h3 className="font-medium text-lg mt-2">「AlphaBot」</h3>
           <p className="text-center text-muted-foreground mt-4 max-w-md">

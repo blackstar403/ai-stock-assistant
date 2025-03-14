@@ -65,7 +65,7 @@ export default function StockChart({ symbol }: StockChartProps) {
   // 当股票代码、时间范围或间隔变化时，加载数据
   useEffect(() => {
     loadPriceHistory();
-  }, [symbol, timeRange, interval]);
+  }, [symbol, timeRange, interval, loadPriceHistory]);
 
   // 自定义工具提示内容
   const CustomTooltip = ({ active, payload, label }: any) => {

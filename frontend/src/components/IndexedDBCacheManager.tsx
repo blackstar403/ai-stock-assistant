@@ -55,7 +55,7 @@ const IndexedDBCacheManager: React.FC = () => {
     
     try {
       const count = await indexedDBCache.clearPattern(pattern);
-      setMessage(`已成功清除匹配 "${pattern}" 的 ${count} 个缓存项`);
+      setMessage(`已成功清除匹配 &quot;${pattern}&quot; 的 ${count} 个缓存项`);
       setPattern(''); // 清空输入
       loadCacheStats(); // 重新加载统计信息
     } catch (err) {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SavedStock } from '../../../../types';
 
 // 模拟数据存储
-let savedStocks: SavedStock[] = [
+const savedStocks: SavedStock[] = [
   {
     symbol: 'AAPL',
     name: '苹果公司',

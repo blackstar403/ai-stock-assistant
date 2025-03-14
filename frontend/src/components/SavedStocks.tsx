@@ -127,7 +127,7 @@ export default function SavedStocks({ onSelectStock }: SavedStocksProps) {
               <Bookmark className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
               <p className="text-muted-foreground">暂无收藏的股票</p>
               <p className="text-xs text-muted-foreground mt-2">
-                搜索并查看股票详情后，点击"收藏股票"按钮添加到此列表
+                搜索并查看股票详情后，点击&quot;收藏股票&quot;按钮添加到此列表
               </p>
             </div>
           </div>

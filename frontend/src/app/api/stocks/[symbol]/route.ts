@@ -94,10 +94,10 @@ const mockStocks: Record<string, StockInfo> = {
 };
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { symbol: string } }
-) {
-  const symbol = params.symbol.toUpperCase();
+  request: NextRequest
+): Promise<Response> {
+  const { pathname } = new URL(request.url);
+  const symbol = pathname.split('/').pop()?.toUpperCase() || '';
   
   // 模拟网络延迟
   await new Promise((resolve) => setTimeout(resolve, 500));

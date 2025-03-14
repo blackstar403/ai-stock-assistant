@@ -65,7 +65,7 @@ const CacheManager: React.FC = () => {
     try {
       const response = await clearCachePattern(pattern);
       if (response.success) {
-        setMessage(response.data?.message || `已成功清除匹配 "${pattern}" 的缓存项`);
+        setMessage(response.data?.message || `已成功清除匹配 &quot;${pattern}&quot; 的缓存项`);
         setPattern(''); // 清空输入
         loadCacheStats(); // 重新加载统计信息
       } else {

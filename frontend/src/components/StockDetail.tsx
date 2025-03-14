@@ -65,7 +65,7 @@ export default function StockDetail({ symbol }: StockDetailProps) {
       }
     };
     checkIfSaved();
-  }, [symbol]);
+  }, [symbol, loadStockInfo]);
 
   const handleSaveStock = async () => {
     if (!stockInfo) return;
