@@ -9,6 +9,7 @@ import SavedStocks from '../components/SavedStocks';
 import CacheControl from '../components/CacheControl';
 import { StockInfo } from '../types';
 import { ChartLine, Search, Settings } from 'lucide-react';
+import { Button } from '../components/ui/button';
 import Link from 'next/link';
 
 export default function Home() {
@@ -41,7 +42,7 @@ export default function Home() {
         <div className="container mx-auto px-4 py-4 flex items-center">
           <div className="flex items-center text-2xl font-bold text-primary">
             <ChartLine className="h-6 w-6 mr-2" />
-            <span>AI股票助理</span>
+            <span>AlphaBot</span>
           </div>
           <div className="ml-auto flex items-center space-x-4">
             <Link
@@ -52,7 +53,15 @@ export default function Home() {
               <span>系统管理</span>
             </Link>
             <a
-              href="https://github.com/yourusername/ai-stock-assistant"
+              href="https://www.jianshu.com/c/38a7568e2b6b"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              简书
+            </a>
+            <a
+              href="https://github.com/x-pai/ai-stock-assistant"
               target="_blank"
               rel="noopener noreferrer"
               className="text-muted-foreground hover:text-foreground"
@@ -108,7 +117,7 @@ export default function Home() {
       <footer className="border-t border-border mt-16">
         <div className="container mx-auto px-4 py-8">
           <div className="text-center text-muted-foreground text-sm">
-            <p>AI股票助理 &copy; {new Date().getFullYear()}</p>
+            <p>AlphaBot &copy; {new Date().getFullYear()}</p>
             <p className="mt-2">
               免责声明：本应用提供的数据和分析仅供参考，不构成投资建议。投资决策请结合个人风险承受能力和专业意见。
             </p>

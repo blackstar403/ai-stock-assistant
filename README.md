@@ -1,10 +1,10 @@
-# 股神助手 - 干翻绿毛A的投资利器
+# AlphaBot - 你的专属智能投资助理
 
 一个基于多数据源和多种分析模式的智能股票分析助手，帮助投资者做出更明智的投资决策。
 
 ## 项目概述
 
-AI 股票助手是一个全栈应用程序，由后端 API 和前端界面组成。它能够获取全球和中国股票市场数据，提供技术分析、基本面分析和 AI 驱动的投资建议。
+AlphaBot是一个全栈应用程序，由后端 API 和前端界面组成。它能够获取全球和中国股票市场数据，提供技术分析、基本面分析和 AI 驱动的投资建议。
 
 ## 免责声明
 
@@ -83,7 +83,7 @@ AI 股票助手是一个全栈应用程序，由后端 API 和前端界面组成
 
 1. 克隆仓库
 ```bash
-git clone https://github.com/yourusername/ai-stock-assistant.git
+git clone https://github.com/x-pai/ai-stock-assistant.git
 cd ai-stock-assistant
 ```
 

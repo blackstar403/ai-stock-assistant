@@ -28,7 +28,7 @@
 
 1. 克隆仓库
 ```bash
-git clone https://github.com/yourusername/ai-stock-assistant.git
+git clone https://github.com/x-pai/ai-stock-assistant.git
 cd ai-stock-assistant/backend
 ```
 
@@ -41,7 +41,7 @@ pip install -r requirements.txt
 创建 `.env` 文件并设置以下变量：
 ```
 # 应用配置
-APP_NAME=AI股票助手
+APP_NAME=AlphaBot
 API_V1_STR=/api
 
 # 数据源配置

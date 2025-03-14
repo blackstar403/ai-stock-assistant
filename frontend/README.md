@@ -1,6 +1,6 @@
-# AI 股票助手前端
+# AlphaBot前端
 
-AI 股票助手的前端界面，使用 React、TypeScript 和 Ant Design 构建。
+AlphaBot的前端界面，使用 React、TypeScript 和 Ant Design 构建。
 
 ## 功能特点
 
@@ -31,7 +31,7 @@ AI 股票助手的前端界面，使用 React、TypeScript 和 Ant Design 构建
 
 1. 克隆仓库
 ```bash
-git clone https://github.com/yourusername/ai-stock-assistant.git
+git clone https://github.com/x-pai/ai-stock-assistant.git
 cd ai-stock-assistant/frontend
 ```
 
