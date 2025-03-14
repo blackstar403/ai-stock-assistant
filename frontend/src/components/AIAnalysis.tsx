@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { getAIAnalysis } from '../lib/api';
 import { AIAnalysis as AIAnalysisType } from '../types';
@@ -15,10 +15,15 @@ export default function AIAnalysis({ symbol }: AIAnalysisProps) {
   const [error, setError] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [analysisType, setAnalysisType] = useState<'rule' | 'ml' | 'llm'>('llm');
+  const [hasError, setHasError] = useState(false);
 
-  // 加载分析数据
-  const loadAnalysis = async (forceRefresh: boolean = false) => {
+  // 使用 useCallback 包装 loadAnalysis 函数
+  const loadAnalysis = useCallback(async (forceRefresh: boolean = false) => {
     if (!symbol) return;
+    
+    // 避免重复请求，特别是对于已经失败的请求
+    if (loading && !forceRefresh) return;
+    if (hasError && !forceRefresh) return;
     
     setLoading(true);
     setError(null);
@@ -28,24 +33,30 @@ export default function AIAnalysis({ symbol }: AIAnalysisProps) {
       if (response.success && response.data) {
         setAnalysis(response.data);
         setHasLoaded(true);
+        setHasError(false);
       } else {
         setError(response.error || '加载分析失败');
         setAnalysis(null);
+        setHasError(true);
       }
     } catch (err) {
       console.error('加载AI分析出错:', err);
       setError('加载分析时出错');
       setAnalysis(null);
+      setHasError(true);
     } finally {
       setLoading(false);
     }
-  };
+  }, [symbol, analysisType, loading, hasError]);
 
-  // 当股票代码或分析类型变化时，重置状态
+  // 当股票代码或分析类型变化时，只重置状态，不自动加载数据
   useEffect(() => {
     setAnalysis(null);
     setError(null);
     setHasLoaded(false);
+    setHasError(false);
+    
+    // 移除自动加载数据的逻辑，改为手动触发
   }, [symbol, analysisType]);
 
   // 获取情绪图标
@@ -155,14 +166,22 @@ export default function AIAnalysis({ symbol }: AIAnalysisProps) {
         )}
         
         {!loading && !error && !hasLoaded && (
-          <div className="py-8 text-center">
+          <div className="py-8 text-center border border-dashed border-gray-200 rounded-md bg-gray-50">
+            <Bot className="h-12 w-12 mx-auto mb-3 text-gray-400" />
             <p className="text-muted-foreground mb-4">
               AI分析需要消耗较多资源，点击下方按钮获取分析结果
             </p>
-            <Button onClick={() => loadAnalysis(false)}>
-              <Bot className="mr-2 h-4 w-4" />
+            <Button 
+              onClick={() => loadAnalysis(false)}
+              className="bg-primary hover:bg-primary/90"
+              size="lg"
+            >
+              <Bot className="mr-2 h-5 w-5" />
               获取AI分析
             </Button>
+            <p className="text-xs text-muted-foreground mt-4">
+              分析可能需要几秒钟时间，请耐心等待
+            </p>
           </div>
         )}
         

@@ -26,7 +26,7 @@ const eslintConfig = [
       "@typescript-eslint/no-empty-object-type": "warn",
       
       // 将 useEffect 依赖项问题转为警告
-      // "react-hooks/exhaustive-deps": "warn",
+      "react-hooks/exhaustive-deps": "error",
       
       // 将 img 元素使用问题转为警告
       // "@next/next/no-img-element": "warn"

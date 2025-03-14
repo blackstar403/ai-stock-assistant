@@ -184,6 +184,8 @@ const CacheManager: React.FC = () => {
               onChange={(e) => setPattern(e.target.value)}
               placeholder="输入缓存键模式"
               className="flex-1 border rounded px-3 py-2"
+              id="cache-pattern"
+              name="cache-pattern"
             />
             <button
               onClick={handleClearPattern}

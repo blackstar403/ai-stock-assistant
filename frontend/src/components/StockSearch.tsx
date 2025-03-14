@@ -68,6 +68,8 @@ export default function StockSearch({ onSelectStock }: StockSearchProps) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="flex-1"
+          id="stock-search"
+          name="stock-search"
         />
         <Button onClick={handleSearch} isLoading={loading} className="min-w-[80px]">
           {!loading && <Search className="h-4 w-4 mr-2" />}

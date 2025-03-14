@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   LineChart,
   Line,
@@ -39,7 +39,7 @@ export default function StockChart({ symbol }: StockChartProps) {
   const [chartType, setChartType] = useState<ChartType>('price-volume');
 
   // 加载股票历史价格数据
-  const loadPriceHistory = async (forceRefresh: boolean = false) => {
+  const loadPriceHistory = useCallback(async (forceRefresh: boolean = false) => {
     if (!symbol) return;
     
     setLoading(true);
@@ -60,12 +60,12 @@ export default function StockChart({ symbol }: StockChartProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [symbol, interval, timeRange]);
 
   // 当股票代码、时间范围或间隔变化时，加载数据
   useEffect(() => {
     loadPriceHistory();
-  }, [symbol, timeRange, interval, loadPriceHistory]);
+  }, [loadPriceHistory]);
 
   // 自定义工具提示内容
   const CustomTooltip = ({ active, payload, label }: any) => {

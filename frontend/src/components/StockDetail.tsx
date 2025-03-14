@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -24,7 +24,7 @@ export default function StockDetail({ symbol }: StockDetailProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const loadStockInfo = async (forceRefresh: boolean = false) => {
+  const loadStockInfo = useCallback(async (forceRefresh: boolean = false) => {
     if (!symbol) return;
     
     if (forceRefresh) {
@@ -51,14 +51,13 @@ export default function StockDetail({ symbol }: StockDetailProps) {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [symbol]);
 
   useEffect(() => {
     loadStockInfo();
     const checkIfSaved = async () => {
       try {
         const savedStocks = JSON.parse(localStorage.getItem('savedStocks') || '[]');
-        console.log(savedStocks);
         setIsSaved(savedStocks.some((s: any) => s.symbol === symbol));
       } catch (err) {
         console.error('检查收藏状态出错:', err);
@@ -296,6 +295,8 @@ export default function StockDetail({ symbol }: StockDetailProps) {
               onChange={(e) => setNotes(e.target.value)}
               disabled={isSaved}
               className="flex-1 h-8 text-sm"
+              id="stock-notes"
+              name="stock-notes"
             />
             {isSaved ? (
               <Button

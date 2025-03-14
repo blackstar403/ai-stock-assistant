@@ -83,6 +83,8 @@ const DataUpdater: React.FC = () => {
             onChange={(e) => setSymbol(e.target.value)}
             placeholder="输入股票代码"
             className="flex-1 border rounded px-3 py-2"
+            id="stock-symbol"
+            name="stock-symbol"
           />
           <button
             onClick={handleUpdateStock}

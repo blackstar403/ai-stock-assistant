@@ -45,6 +45,17 @@ api.interceptors.response.use(
       }
     }
     
+    // 对于404错误，我们应该返回一个特定的错误对象，而不是直接拒绝Promise
+    if (error.response && error.response.status === 404) {
+      return Promise.resolve({
+        data: {
+          success: false,
+          error: '请求的资源不存在',
+          isNotFound: true
+        }
+      });
+    }
+    
     return Promise.reject(error);
   }
 );

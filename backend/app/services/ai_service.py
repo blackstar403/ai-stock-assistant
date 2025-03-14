@@ -445,8 +445,6 @@ class AIService:
             historical_data,
             fundamentals,
             technical_indicators,
-            sector_linkage,
-            concept_distribution
         )
         
         # 如果机器学习分析失败，回退到规则分析

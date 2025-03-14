@@ -202,6 +202,8 @@ const TaskManager: React.FC = () => {
                   onChange={(e) => setNewTask({ ...newTask, task_type: e.target.value })}
                   className="w-full border rounded px-3 py-2"
                   disabled
+                  id="task-type"
+                  name="task-type"
                 >
                   <option value="update_stock_data">更新股票数据</option>
                 </select>
@@ -218,6 +220,8 @@ const TaskManager: React.FC = () => {
                   onChange={(e) => setNewTask({ ...newTask, symbol: e.target.value })}
                   placeholder="留空则更新所有股票"
                   className="w-full border rounded px-3 py-2"
+                  id="task-symbol"
+                  name="task-symbol"
                 />
                 <p className="text-xs text-gray-500 mt-1">如果留空，将更新所有股票数据</p>
               </div>
@@ -233,6 +237,8 @@ const TaskManager: React.FC = () => {
                     onChange={(e) => setNewTask({ ...newTask, interval: parseInt(e.target.value) })}
                     min="60"
                     className="w-full border rounded px-3 py-2"
+                    id="task-interval"
+                    name="task-interval"
                   />
                   <span className="text-gray-500">{formatInterval(newTask.interval)}</span>
                 </div>
