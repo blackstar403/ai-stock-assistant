@@ -211,6 +211,15 @@ export default function AIAnalysis({ symbol }: AIAnalysisProps) {
               <p>
                 免责声明: 此分析仅供参考，不构成投资建议。投资决策请结合个人风险承受能力和专业意见。
               </p>
+              <p className="flex items-center">
+                <span>想获取更多专业分析？</span>
+                <a 
+                  href="/about" 
+                  className="text-primary hover:underline ml-1"
+                >
+                  关注「AlphaBot」公众号
+                </a>
+              </p>
             </div>
           </div>
         )}

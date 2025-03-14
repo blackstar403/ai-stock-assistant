@@ -226,6 +226,14 @@ docker-compose down
 4. 推送到分支 (`git push origin feature/amazing-feature`)
 5. 创建 Pull Request
 
+## 关注我们
+
+<div align="center">
+  <img src="./materials/扫码_搜索联合传播样式-标准色版.png" alt="AlphaBot公众号" width="200"/>
+</div>
+
+欢迎加入我们的QQ群，与其他投资者和开发者交流讨论：[点击链接加入群聊【AlphaBot交流群】](https://qm.qq.com/q/ES8Fp8AdpY)
+
 ## 许可证
 
 Apache License 2.0

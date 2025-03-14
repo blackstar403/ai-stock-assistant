@@ -8,7 +8,7 @@ import AIAnalysis from '../components/AIAnalysis';
 import SavedStocks from '../components/SavedStocks';
 import CacheControl from '../components/CacheControl';
 import { StockInfo } from '../types';
-import { ChartLine, Search, Settings } from 'lucide-react';
+import { ChartLine, Search, Settings, Info } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import Link from 'next/link';
 
@@ -76,6 +76,13 @@ export default function Home() {
             >
               GitHub
             </a>
+            <Link
+              href="/about"
+              className="flex items-center text-muted-foreground hover:text-foreground"
+            >
+              <Info className="h-5 w-5 mr-1" />
+              <span>关于我们</span>
+            </Link>
           </div>
         </div>
       </header>
