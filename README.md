@@ -228,11 +228,17 @@ docker-compose down
 
 ## 关注我们
 
+公众号：
 <div align="center">
-  <img src="./materials/扫码_搜索联合传播样式-标准色版.png" alt="AlphaBot公众号" width="200"/>
+  <img src="./materials/mp_weixin_qr.png" alt="AlphaBot公众号" width="300"/>
 </div>
 
-欢迎加入我们的QQ群，与其他投资者和开发者交流讨论：[点击链接加入群聊【AlphaBot交流群】](https://qm.qq.com/q/ES8Fp8AdpY)
+微信群：
+<div align="center">
+  <img src="./materials/wechat_group_qr.jpg" alt="AlphaBot微信群" width="200"/>
+</div>
+
+QQ群：[点击链接加入群聊【AlphaBot交流群】](https://qm.qq.com/q/ES8Fp8AdpY)
 
 ## 许可证
 
