@@ -235,10 +235,26 @@ docker-compose down
 
 微信群：
 <div align="center">
-  <img src="./materials/wechat_group_qr.jpg" alt="AlphaBot微信群" width="200"/>
+  <img src="./materials/wechat_group_qr.jpg" alt="AlphaBot微信群" width="300"/>
 </div>
 
 QQ群：[点击链接加入群聊【AlphaBot交流群】](https://qm.qq.com/q/ES8Fp8AdpY)
+
+## 赞助本项目
+
+如果您觉得这个项目对您有帮助，欢迎赞助我们，支持项目的持续开发和维护。
+
+<div align="center">
+  <img src="./materials/sponsor_qr.jpg" alt="赞助二维码" width="250"/>
+  <p>微信扫码赞助</p>
+</div>
+
+每一笔赞助都将用于：
+- 服务器和基础设施维护
+- 新功能开发和技术升级
+- 社区活动和用户支持
+
+感谢您的支持！
 
 ## 许可证
 
