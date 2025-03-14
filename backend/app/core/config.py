@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # 应用信息
     APP_NAME: str = "AI Stock Assistant API"
-    API_V1_STR: str = "/api"
+    API_V1_STR: str = "/api/v1"
     
     # 数据源配置
     # 可选值: "alphavantage", "tushare", "akshare"
@@ -32,8 +32,14 @@ class Settings(BaseSettings):
     # 数据库配置
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./stock_assistant.db")
     
-    # CORS配置
-    CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:8000"]
+    # CORS配置 - 允许本地开发和Docker环境
+    CORS_ORIGINS: list = [
+        "http://localhost:3000",  # 本地开发环境
+        "http://localhost:8000",  # 本地后端
+        "http://frontend:3000",   # Docker环境中的前端服务
+        "http://backend:8000",    # Docker环境中的后端服务
+        "*",                      # 允许所有来源（仅用于测试，生产环境应移除）
+    ]
     
     # 安全配置
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-for-development-only")

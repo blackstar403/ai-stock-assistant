@@ -5,6 +5,11 @@ import { indexedDBCache } from './indexedDBCache';
 // API基础URL，优先使用环境变量，否则使用相对路径
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
+// 开发环境下输出API基础URL，帮助调试
+if (process.env.NODE_ENV !== 'production') {
+  console.log('API Base URL:', API_BASE_URL);
+}
+
 // 创建axios实例
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -24,6 +29,11 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
+    // 开发环境下输出请求信息，帮助调试
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    }
+    
     return config;
   },
   (error) => {
@@ -35,6 +45,13 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // 输出错误信息，帮助调试
+    console.error('API Error:', error.message);
+    if (error.response) {
+      console.error('Status:', error.response.status);
+      console.error('Data:', error.response.data);
+    }
+    
     // 如果是401错误（未授权），可以重定向到登录页面
     if (error.response && error.response.status === 401) {
       // 清除本地存储的令牌

@@ -42,7 +42,7 @@ pip install -r requirements.txt
 ```
 # 应用配置
 APP_NAME=AlphaBot
-API_V1_STR=/api
+API_V1_STR=/api/v1
 
 # 数据源配置
 DEFAULT_DATA_SOURCE=alphavantage  # 可选值: alphavantage, tushare, akshare
