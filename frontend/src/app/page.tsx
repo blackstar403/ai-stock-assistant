@@ -61,6 +61,14 @@ export default function Home() {
               简书
             </a>
             <a
+              href="https://x-pai.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              X-PAI
+            </a>
+            <a
               href="https://github.com/x-pai/ai-stock-assistant"
               target="_blank"
               rel="noopener noreferrer"
