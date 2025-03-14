@@ -1,4 +1,4 @@
-import requests
+import httpx
 from typing import List, Optional, Dict, Any
 import pandas as pd
 from datetime import datetime
@@ -13,6 +13,7 @@ class AlphaVantageDataSource(DataSourceBase):
     def __init__(self):
         self.base_url = settings.ALPHAVANTAGE_API_BASE_URL
         self.api_key = settings.ALPHAVANTAGE_API_KEY
+        self.client = httpx.AsyncClient(timeout=30.0)  # 创建异步HTTP客户端
     
     async def search_stocks(self, query: str) -> List[StockInfo]:
         """搜索股票"""
@@ -23,7 +24,7 @@ class AlphaVantageDataSource(DataSourceBase):
                 "keywords": query,
                 "apikey": self.api_key
             }
-            response = requests.get(self.base_url, params=params)
+            response = await self.client.get(self.base_url, params=params)
             data = response.json()
             
             if "bestMatches" not in data:
@@ -53,7 +54,7 @@ class AlphaVantageDataSource(DataSourceBase):
                 "symbol": symbol,
                 "apikey": self.api_key
             }
-            response = requests.get(self.base_url, params=params)
+            response = await self.client.get(self.base_url, params=params)
             quote_data = response.json()
             
             # 获取公司概览
@@ -62,7 +63,7 @@ class AlphaVantageDataSource(DataSourceBase):
                 "symbol": symbol,
                 "apikey": self.api_key
             }
-            overview_response = requests.get(self.base_url, params=params)
+            overview_response = await self.client.get(self.base_url, params=params)
             overview_data = overview_response.json()
             
             if "Global Quote" not in quote_data or not overview_data:
@@ -115,7 +116,7 @@ class AlphaVantageDataSource(DataSourceBase):
                 "outputsize": output_size,
                 "apikey": self.api_key
             }
-            response = requests.get(self.base_url, params=params)
+            response = await self.client.get(self.base_url, params=params)
             data = response.json()
             
             # 提取时间序列数据
@@ -174,7 +175,7 @@ class AlphaVantageDataSource(DataSourceBase):
                 "symbol": symbol,
                 "apikey": self.api_key
             }
-            response = requests.get(self.base_url, params=params)
+            response = await self.client.get(self.base_url, params=params)
             data = response.json()
             
             return data
@@ -192,7 +193,7 @@ class AlphaVantageDataSource(DataSourceBase):
                 "outputsize": "compact",
                 "apikey": self.api_key
             }
-            response = requests.get(self.base_url, params=params)
+            response = await self.client.get(self.base_url, params=params)
             data = response.json()
             
             # 提取时间序列数据
@@ -231,7 +232,7 @@ class AlphaVantageDataSource(DataSourceBase):
             }
             
             # 发送请求
-            response = await self._make_request(url, params)
+            response = await self.client.get(url, params=params)
             
             if not response or "feed" not in response:
                 return {}
@@ -271,7 +272,7 @@ class AlphaVantageDataSource(DataSourceBase):
                 "apikey": self.api_key
             }
             
-            response = await self._make_request(url, params)
+            response = await self.client.get(url, params=params)
             
             if response and "Sector" in response:
                 sector_name = response["Sector"]
@@ -302,4 +303,9 @@ class AlphaVantageDataSource(DataSourceBase):
             "leading_concepts": [],
             "lagging_concepts": [],
             "all_concepts": []
-        } 
+        }
+    
+    async def __del__(self):
+        """析构函数，确保关闭HTTP客户端"""
+        if hasattr(self, 'client'):
+            await self.client.aclose() 

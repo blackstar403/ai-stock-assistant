@@ -2,7 +2,7 @@
 OpenAI 服务，用于与 OpenAI API 交互
 """
 
-import openai
+from openai import AsyncOpenAI
 from typing import Dict, Any, List, Optional
 import json
 
@@ -13,7 +13,7 @@ class OpenAIService:
     
     def __init__(self):
         """初始化 OpenAI 客户端"""
-        self.client = openai.OpenAI(
+        self.client = AsyncOpenAI(
             api_key=settings.OPENAI_API_KEY,
             base_url=settings.OPENAI_API_BASE
         )
@@ -45,7 +45,7 @@ class OpenAIService:
             )
             
             # 调用 OpenAI API
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": "你是一位专业的股票分析师，精通《专业投机原理》，擅长分析股票数据并提供投资建议。"},

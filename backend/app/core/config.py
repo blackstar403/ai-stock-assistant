@@ -50,6 +50,19 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
     OPENAI_API_BASE: str = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
     
+    # 请求频率限制配置
+    RATE_LIMIT_ENABLED: bool = os.getenv("RATE_LIMIT_ENABLED", "True").lower() == "true"
+    # 默认限制：每分钟60个请求
+    RATE_LIMIT_DEFAULT_MINUTE: int = int(os.getenv("RATE_LIMIT_DEFAULT_MINUTE", "60"))
+    # 搜索API限制：每分钟30个请求
+    RATE_LIMIT_SEARCH_MINUTE: int = int(os.getenv("RATE_LIMIT_SEARCH_MINUTE", "30"))
+    # 股票详情API限制：每分钟20个请求
+    RATE_LIMIT_STOCK_INFO_MINUTE: int = int(os.getenv("RATE_LIMIT_STOCK_INFO_MINUTE", "20"))
+    # AI分析API限制：每分钟10个请求
+    RATE_LIMIT_AI_ANALYSIS_MINUTE: int = int(os.getenv("RATE_LIMIT_AI_ANALYSIS_MINUTE", "10"))
+    # 后台任务API限制：每分钟5个请求
+    RATE_LIMIT_TASK_MINUTE: int = int(os.getenv("RATE_LIMIT_TASK_MINUTE", "5"))
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

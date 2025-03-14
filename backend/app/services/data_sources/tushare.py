@@ -3,6 +3,8 @@ from typing import List, Optional, Dict, Any
 import pandas as pd
 from datetime import datetime, timedelta
 import re
+import asyncio
+from functools import partial
 
 from app.core.config import settings
 from app.services.data_sources.base import DataSourceBase
@@ -15,11 +17,16 @@ class TushareDataSource(DataSourceBase):
         # 初始化 Tushare
         self.api = ts.pro_api(settings.TUSHARE_API_TOKEN)
     
+    async def _run_sync(self, func, *args, **kwargs):
+        """在线程池中运行同步函数"""
+        return await asyncio.to_thread(func, *args, **kwargs)
+    
     async def search_stocks(self, query: str) -> List[StockInfo]:
         """搜索股票"""
         try:
             # 获取股票列表
-            stocks = self.api.stock_basic(
+            stocks = await self._run_sync(
+                self.api.stock_basic,
                 exchange='', 
                 list_status='L', 
                 fields='ts_code,name,exchange,curr_type'
@@ -53,7 +60,8 @@ class TushareDataSource(DataSourceBase):
         """获取股票详细信息"""
         try:
             # 获取股票基本信息
-            stock_basic = self.api.stock_basic(
+            stock_basic = await self._run_sync(
+                self.api.stock_basic,
                 ts_code=symbol, 
                 fields='ts_code,name,exchange,curr_type,list_date'
             )
@@ -63,12 +71,12 @@ class TushareDataSource(DataSourceBase):
             
             # 获取最新行情
             today = datetime.now().strftime('%Y%m%d')
-            daily = self.api.daily(ts_code=symbol, trade_date=today)
+            daily = await self._run_sync(self.api.daily, ts_code=symbol, trade_date=today)
             
             # 如果当天没有数据，尝试获取最近的交易日数据
             if daily.empty:
                 # 获取最近10个交易日
-                trade_cal = self.api.trade_cal(
+                trade_cal = await self._run_sync(self.api.trade_cal,
                     exchange='SSE', 
                     start_date=(datetime.now() - timedelta(days=30)).strftime('%Y%m%d'),
                     end_date=today
@@ -76,7 +84,7 @@ class TushareDataSource(DataSourceBase):
                 trade_dates = trade_cal[trade_cal['is_open'] == 1]['cal_date'].sort_values(ascending=False)
                 
                 for date in trade_dates:
-                    daily = self.api.daily(ts_code=symbol, trade_date=date)
+                    daily = await self._run_sync(self.api.daily, ts_code=symbol, trade_date=date)
                     if not daily.empty:
                         break
             
@@ -84,7 +92,7 @@ class TushareDataSource(DataSourceBase):
                 return None
             
             # 获取公司基本信息
-            company = self.api.stock_company(ts_code=symbol)
+            company = await self._run_sync(self.api.stock_company, ts_code=symbol)
             
             # 构建股票信息
             row = stock_basic.iloc[0]
@@ -96,7 +104,7 @@ class TushareDataSource(DataSourceBase):
             
             # 获取市值信息
             try:
-                daily_basic = self.api.daily_basic(ts_code=symbol, trade_date=daily_row['trade_date'])
+                daily_basic = await self._run_sync(self.api.daily_basic, ts_code=symbol, trade_date=daily_row['trade_date'])
                 market_cap = daily_basic.iloc[0]['total_mv'] * 10000 if not daily_basic.empty else 0
             except:
                 market_cap = 0
@@ -149,11 +157,11 @@ class TushareDataSource(DataSourceBase):
             
             # 根据间隔选择 API
             if interval == "daily":
-                df = self.api.daily(ts_code=symbol, start_date=start_date_str, end_date=end_date_str)
+                df = await self._run_sync(self.api.daily, ts_code=symbol, start_date=start_date_str, end_date=end_date_str)
             elif interval == "weekly":
-                df = self.api.weekly(ts_code=symbol, start_date=start_date_str, end_date=end_date_str)
+                df = await self._run_sync(self.api.weekly, ts_code=symbol, start_date=start_date_str, end_date=end_date_str)
             else:  # monthly
-                df = self.api.monthly(ts_code=symbol, start_date=start_date_str, end_date=end_date_str)
+                df = await self._run_sync(self.api.monthly, ts_code=symbol, start_date=start_date_str, end_date=end_date_str)
             
             if df.empty:
                 return None
@@ -187,25 +195,25 @@ class TushareDataSource(DataSourceBase):
         """获取公司基本面数据"""
         try:
             # 获取公司基本信息
-            company = self.api.stock_company(ts_code=symbol)
+            company = await self._run_sync(self.api.stock_company, ts_code=symbol)
             
             # 获取财务指标
             today = datetime.now().strftime('%Y%m%d')
-            fina_indicator = self.api.fina_indicator(ts_code=symbol, period=today[:6])
+            fina_indicator = await self._run_sync(self.api.fina_indicator, ts_code=symbol, period=today[:6])
             
             # 如果当期没有数据，尝试获取最近的财报
             if fina_indicator.empty:
                 # 尝试上一季度
                 last_quarter = (datetime.now() - timedelta(days=90)).strftime('%Y%m%d')
-                fina_indicator = self.api.fina_indicator(ts_code=symbol, period=last_quarter[:6])
+                fina_indicator = await self._run_sync(self.api.fina_indicator, ts_code=symbol, period=last_quarter[:6])
             
             # 获取最新行情
-            daily_basic = self.api.daily_basic(ts_code=symbol, trade_date=today)
+            daily_basic = await self._run_sync(self.api.daily_basic, ts_code=symbol, trade_date=today)
             
             # 如果当天没有数据，尝试获取最近的交易日数据
             if daily_basic.empty:
                 # 获取最近10个交易日
-                trade_cal = self.api.trade_cal(
+                trade_cal = await self._run_sync(self.api.trade_cal,
                     exchange='SSE', 
                     start_date=(datetime.now() - timedelta(days=30)).strftime('%Y%m%d'),
                     end_date=today
@@ -213,7 +221,7 @@ class TushareDataSource(DataSourceBase):
                 trade_dates = trade_cal[trade_cal['is_open'] == 1]['cal_date'].sort_values(ascending=False)
                 
                 for date in trade_dates:
-                    daily_basic = self.api.daily_basic(ts_code=symbol, trade_date=date)
+                    daily_basic = await self._run_sync(self.api.daily_basic, ts_code=symbol, trade_date=date)
                     if not daily_basic.empty:
                         break
             
@@ -254,7 +262,7 @@ class TushareDataSource(DataSourceBase):
             end_date = datetime.now().strftime('%Y%m%d')
             start_date = (datetime.now() - timedelta(days=365)).strftime('%Y%m%d')
             
-            df = self.api.daily(ts_code=symbol, start_date=start_date, end_date=end_date)
+            df = await self._run_sync(self.api.daily, ts_code=symbol, start_date=start_date, end_date=end_date)
             
             if df.empty:
                 return None
@@ -300,7 +308,7 @@ class TushareDataSource(DataSourceBase):
                 
                 try:
                     # 获取公司新闻
-                    df = self.api.news(ts_code=ts_code, start_date=(datetime.now() - timedelta(days=30)).strftime('%Y%m%d'))
+                    df = await self._run_sync(self.api.news, ts_code=ts_code, start_date=(datetime.now() - timedelta(days=30)).strftime('%Y%m%d'))
                     
                     if not df.empty:
                         feed = []
@@ -358,7 +366,7 @@ class TushareDataSource(DataSourceBase):
             
             try:
                 # 获取股票所属行业
-                stock_basic = self.api.stock_basic(ts_code=ts_code, fields='ts_code,name,industry')
+                stock_basic = await self._run_sync(self.api.stock_basic, ts_code=ts_code, fields='ts_code,name,industry')
                 
                 if stock_basic.empty:
                     return self._default_sector_linkage()
@@ -369,7 +377,7 @@ class TushareDataSource(DataSourceBase):
                     return self._default_sector_linkage()
                 
                 # 获取同行业股票
-                industry_stocks = self.api.stock_basic(industry=sector_name, fields='ts_code,name')
+                industry_stocks = await self._run_sync(self.api.stock_basic, industry=sector_name, fields='ts_code,name')
                 sector_total = len(industry_stocks)
                 
                 if sector_total <= 1:
@@ -418,7 +426,7 @@ class TushareDataSource(DataSourceBase):
             
             try:
                 # 获取股票所属概念
-                concept_detail = self.api.concept_detail(ts_code=ts_code)
+                concept_detail = await self._run_sync(self.api.concept_detail, ts_code=ts_code)
                 
                 if concept_detail.empty:
                     return self._default_concept_distribution()

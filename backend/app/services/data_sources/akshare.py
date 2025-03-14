@@ -3,6 +3,8 @@ from typing import List, Optional, Dict, Any
 import pandas as pd
 from datetime import datetime, timedelta
 import re
+import asyncio
+from functools import partial
 
 from app.core.config import settings
 from app.services.data_sources.base import DataSourceBase
@@ -16,12 +18,16 @@ class AKShareDataSource(DataSourceBase):
         if settings.AKSHARE_USE_PROXY and settings.AKSHARE_PROXY_URL:
             ak.set_proxy(proxy=settings.AKSHARE_PROXY_URL)
     
+    async def _run_sync(self, func, *args, **kwargs):
+        """在线程池中运行同步函数"""
+        return await asyncio.to_thread(func, *args, **kwargs)
+    
     async def search_stocks(self, query: str) -> List[StockInfo]:
         print(f"搜索股票: {query}")
         """搜索股票"""
         try:
             # 获取A股股票列表
-            stock_info_a_code_name_df = ak.stock_info_a_code_name()
+            stock_info_a_code_name_df = await self._run_sync(ak.stock_info_a_code_name)
             
             # 过滤匹配的股票
             filtered_stocks = stock_info_a_code_name_df[
@@ -66,10 +72,10 @@ class AKShareDataSource(DataSourceBase):
             
             # 获取实时行情
             if market == 'SH':
-                df = ak.stock_sh_a_spot_em()
+                df = await self._run_sync(ak.stock_sh_a_spot_em)
                 df = df[df['代码'] == code]
             else:  # SZ
-                df = ak.stock_sz_a_spot_em()
+                df = await self._run_sync(ak.stock_sz_a_spot_em)
                 df = df[df['代码'] == code]
             
             if df.empty:
@@ -78,7 +84,7 @@ class AKShareDataSource(DataSourceBase):
             row = df.iloc[0]
             
             # 获取股票名称
-            stock_info_df = ak.stock_info_a_code_name()
+            stock_info_df = await self._run_sync(ak.stock_info_a_code_name)
             stock_info = stock_info_df[stock_info_df['code'] == code]
             name = stock_info.iloc[0]['name'] if not stock_info.empty else ""
             
@@ -148,29 +154,11 @@ class AKShareDataSource(DataSourceBase):
             
             # 根据间隔选择不同的数据
             if interval == "daily":
-                df = ak.stock_zh_a_hist(
-                    symbol=code, 
-                    period="daily", 
-                    start_date=start_date_str, 
-                    end_date=end_date_str, 
-                    adjust="qfq"
-                )
+                df = await self._run_sync(ak.stock_zh_a_hist, symbol=code, period="daily", start_date=start_date_str, end_date=end_date_str, adjust="qfq")
             elif interval == "weekly":
-                df = ak.stock_zh_a_hist(
-                    symbol=code, 
-                    period="weekly", 
-                    start_date=start_date_str, 
-                    end_date=end_date_str, 
-                    adjust="qfq"
-                )
+                df = await self._run_sync(ak.stock_zh_a_hist, symbol=code, period="weekly", start_date=start_date_str, end_date=end_date_str, adjust="qfq")
             else:  # monthly
-                df = ak.stock_zh_a_hist(
-                    symbol=code, 
-                    period="monthly", 
-                    start_date=start_date_str, 
-                    end_date=end_date_str, 
-                    adjust="qfq"
-                )
+                df = await self._run_sync(ak.stock_zh_a_hist, symbol=code, period="monthly", start_date=start_date_str, end_date=end_date_str, adjust="qfq")
             
             if df.empty:
                 return None
@@ -215,13 +203,13 @@ class AKShareDataSource(DataSourceBase):
             code = code_match.group(1)
             
             # 获取公司基本信息
-            stock_info = ak.stock_individual_info_em(symbol=code)
+            stock_info = await self._run_sync(ak.stock_individual_info_em, symbol=code)
             
             # 获取财务指标
-            financial_indicator = ak.stock_financial_analysis_indicator(symbol=code)
+            financial_indicator = await self._run_sync(ak.stock_financial_analysis_indicator, symbol=code)
             
             # 获取市盈率、市净率等指标
-            stock_a_lg_indicator = ak.stock_a_indicator_lg(symbol=code)
+            stock_a_lg_indicator = await self._run_sync(ak.stock_a_indicator_lg, symbol=code)
             
             # 合并数据
             result = {}
@@ -251,7 +239,7 @@ class AKShareDataSource(DataSourceBase):
             
             # 获取股息率
             try:
-                dividend_info = ak.stock_history_dividend_detail(symbol=code, indicator="分红")
+                dividend_info = await self._run_sync(ak.stock_history_dividend_detail, symbol=code, indicator="分红")
                 if not dividend_info.empty:
                     latest_dividend = dividend_info.iloc[0]
                     result["DividendYield"] = latest_dividend["派息比例"] if "派息比例" in latest_dividend else "0"
@@ -262,7 +250,7 @@ class AKShareDataSource(DataSourceBase):
             
             # 获取市值
             try:
-                stock_zh_a_spot_em = ak.stock_zh_a_spot_em()
+                stock_zh_a_spot_em = await self._run_sync(ak.stock_zh_a_spot_em)
                 stock_info = stock_zh_a_spot_em[stock_zh_a_spot_em['代码'] == code]
                 if not stock_info.empty:
                     result["MarketCapitalization"] = float(stock_info.iloc[0]['总市值']) * 100000000
@@ -290,13 +278,7 @@ class AKShareDataSource(DataSourceBase):
             end_date = datetime.now().strftime('%Y%m%d')
             start_date = (datetime.now() - timedelta(days=365)).strftime('%Y%m%d')
             
-            df = ak.stock_zh_a_hist(
-                symbol=code, 
-                period="daily", 
-                start_date=start_date, 
-                end_date=end_date, 
-                adjust="qfq"
-            )
+            df = await self._run_sync(ak.stock_zh_a_hist, symbol=code, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
             print(f"获取历史数据: {len(df)}")
             
             if df.empty:
@@ -339,7 +321,7 @@ class AKShareDataSource(DataSourceBase):
                 code = code_match.group(1)
                 try:
                     # 获取股票相关新闻
-                    stock_news = ak.stock_news_em(symbol=code)
+                    stock_news = await self._run_sync(ak.stock_news_em, symbol=code)
                     
                     if not stock_news.empty:
                         feed = []
@@ -358,7 +340,7 @@ class AKShareDataSource(DataSourceBase):
             # 获取政策新闻并计算政策共振系数
             try:
                 # 获取最近的经济政策新闻
-                policy_data = ak.news_economic_baidu()
+                policy_data = await self._run_sync(ak.news_economic_baidu)
                 
                 if not policy_data.empty:
                     # 获取股票名称
@@ -393,7 +375,7 @@ class AKShareDataSource(DataSourceBase):
                             relevance += 3
                         
                         # 分析政策对行业的影响
-                        industry_keywords = self._get_industry_keywords(symbol)
+                        industry_keywords = await self._get_industry_keywords(symbol)
                         for keyword in industry_keywords:
                             if keyword in policy_title:
                                 relevance += 2
@@ -432,32 +414,34 @@ class AKShareDataSource(DataSourceBase):
                 }
             }
     
-    def _get_industry_keywords(self, symbol: str) -> List[str]:
-        """获取股票所属行业的关键词"""
+    async def _get_industry_keywords(self, symbol: str) -> List[str]:
+        """获取行业关键词"""
         try:
-            # 从股票代码判断行业
+            # 解析股票代码
             code_match = re.match(r'(\d+)\.([A-Z]+)', symbol)
             if not code_match:
                 return []
             
             code = code_match.group(1)
             
-            # 尝试获取股票所属行业
-            try:
-                stock_industry = ak.stock_industry_category_cninfo()
-                stock_row = stock_industry[stock_industry['证券代码'] == code]
+            # 获取股票行业分类数据
+            stock_row = await self._run_sync(ak.stock_individual_info_em, symbol=code)
+
+            # 提取行业信息
+            if not stock_row.empty:
+                industry = None
+                for col in stock_row.columns:
+                    if '所属行业' in col:
+                        industry = stock_row.iloc[0][col]
+                        break
                 
-                if not stock_row.empty:
-                    industry = stock_row.iloc[0]['所属行业']
-                    # 根据行业返回相关关键词
+                if industry:
                     return self._industry_to_keywords(industry)
-            except:
-                pass
             
-            # 默认关键词
-            return ["经济", "政策", "发展", "改革", "创新", "金融", "市场", "投资"]
-        except:
-            return ["经济", "政策", "发展", "改革", "创新", "金融", "市场", "投资"]
+            return []
+        except Exception as e:
+            print(f"获取行业关键词时出错: {str(e)}")
+            return []
     
     def _industry_to_keywords(self, industry: str) -> List[str]:
         """根据行业返回相关关键词"""
@@ -504,7 +488,7 @@ class AKShareDataSource(DataSourceBase):
             # 获取股票所属板块
             try:
                 # 获取股票行业分类数据
-                stock_row = ak.stock_individual_info_em(symbol=code)
+                stock_row = await self._run_sync(ak.stock_individual_info_em, symbol=code)
 
                 # 提取行业信息
                 industry_info = None
@@ -521,7 +505,7 @@ class AKShareDataSource(DataSourceBase):
                 sector_name = industry_info
 
                 # 获取同行业股票
-                sector_stocks = ak.stock_board_industry_cons_em(symbol=sector_name)
+                sector_stocks = await self._run_sync(ak.stock_board_industry_cons_em, symbol=sector_name)
                 sector_total = len(sector_stocks)
                 
                 if sector_total <= 1:
@@ -539,13 +523,7 @@ class AKShareDataSource(DataSourceBase):
                 end_date = datetime.now().strftime('%Y%m%d')
                 start_date = (datetime.now() - timedelta(days=60)).strftime('%Y%m%d')
                 
-                target_stock_data = ak.stock_zh_a_hist(
-                    symbol=code, 
-                    period="daily", 
-                    start_date=start_date, 
-                    end_date=end_date, 
-                    adjust="qfq"
-                )
+                target_stock_data = await self._run_sync(ak.stock_zh_a_hist, symbol=code, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
                 
                 if target_stock_data.empty:
                     return self._default_sector_linkage(sector_name)
@@ -562,13 +540,7 @@ class AKShareDataSource(DataSourceBase):
                         continue
                     
                     try:
-                        stock_data = ak.stock_zh_a_hist(
-                            symbol=sector_code, 
-                            period="daily", 
-                            start_date=start_date, 
-                            end_date=end_date, 
-                            adjust="qfq"
-                        )
+                        stock_data = await self._run_sync(ak.stock_zh_a_hist, symbol=sector_code, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
                         
                         if not stock_data.empty:
                             stock_data['日期'] = pd.to_datetime(stock_data['日期'])
@@ -638,13 +610,7 @@ class AKShareDataSource(DataSourceBase):
                         continue
                     
                     try:
-                        other_data = ak.stock_zh_a_hist(
-                            symbol=other_code, 
-                            period="daily", 
-                            start_date=start_date, 
-                            end_date=end_date, 
-                            adjust="qfq"
-                        )
+                        other_data = await self._run_sync(ak.stock_zh_a_hist, symbol=other_code, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
                         
                         if not other_data.empty:
                             # 计算涨幅
@@ -698,7 +664,7 @@ class AKShareDataSource(DataSourceBase):
             # 获取股票所属概念
             try:
                 # 获取股票概念
-                stock_concept = ak.stock_board_concept_name_em()
+                stock_concept = await self._run_sync(ak.stock_board_concept_name_em)
 
                 if stock_concept.empty:
                     return self._default_concept_distribution()
@@ -712,11 +678,11 @@ class AKShareDataSource(DataSourceBase):
                     concept_code = concept_row['板块代码']
                     try:
                         # 获取概念成分股
-                        concept_stocks = ak.stock_board_concept_cons_em(symbol=concept_code)
+                        concept_stocks = await self._run_sync(ak.stock_board_concept_cons_em, symbol=concept_code)
                         # 检查股票是否在概念成分股中
                         if not concept_stocks.empty and code in concept_stocks['代码'].values:
                             # 获取概念指数
-                            concept_index = ak.stock_board_concept_hist_ths(symbol=concept_code, period="D", start_date="20230101", end_date=datetime.now().strftime('%Y%m%d'))
+                            concept_index = await self._run_sync(ak.stock_board_concept_hist_ths, symbol=concept_code, period="D", start_date="20230101", end_date=datetime.now().strftime('%Y%m%d'))
                             
                             if not concept_index.empty:
                                 # 计算概念强度（最近一个月的涨幅）
@@ -732,13 +698,7 @@ class AKShareDataSource(DataSourceBase):
                                     end_date = datetime.now().strftime('%Y%m%d')
                                     start_date = (datetime.now() - timedelta(days=30)).strftime('%Y%m%d')
                                     
-                                    stock_data = ak.stock_zh_a_hist(
-                                        symbol=code, 
-                                        period="daily", 
-                                        start_date=start_date, 
-                                        end_date=end_date, 
-                                        adjust="qfq"
-                                    )
+                                    stock_data = await self._run_sync(ak.stock_zh_a_hist, symbol=code, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
                                     
                                     if not stock_data.empty and len(stock_data) > 5:
                                         stock_return = (stock_data['收盘'].iloc[-1] / stock_data['收盘'].iloc[0] - 1)

@@ -39,6 +39,7 @@ class SchedulerService:
     """定时任务调度服务"""
     
     _instance = None
+    _lock = asyncio.Lock()  # 添加锁以保护共享资源
     
     def __new__(cls):
         if cls._instance is None:
@@ -46,9 +47,10 @@ class SchedulerService:
             cls._instance._tasks: Dict[str, Task] = {}
             cls._instance._running = False
             cls._instance._task_loop = None
+            cls._instance._task_lock = asyncio.Lock()  # 添加任务锁
         return cls._instance
     
-    def add_task(
+    async def add_task(
         self, 
         func: Callable[..., Awaitable[Any]], 
         args: List[Any] = None, 
@@ -59,8 +61,10 @@ class SchedulerService:
         is_enabled: bool = True
     ) -> str:
         """添加定时任务"""
+        # 生成任务ID
         task_id = task_id or str(uuid.uuid4())
         
+        # 创建任务
         task = Task(
             task_id=task_id,
             func=func,
@@ -71,52 +75,48 @@ class SchedulerService:
             is_enabled=is_enabled
         )
         
-        self._tasks[task_id] = task
+        # 添加到任务列表
+        async with self._task_lock:
+            self._tasks[task_id] = task
+        
         logger.info(f"添加任务: {task_id} - {description}")
         return task_id
     
-    def remove_task(self, task_id: str) -> bool:
+    async def remove_task(self, task_id: str) -> bool:
         """移除定时任务"""
-        if task_id in self._tasks:
-            del self._tasks[task_id]
-            logger.info(f"移除任务: {task_id}")
-            return True
+        async with self._task_lock:
+            if task_id in self._tasks:
+                del self._tasks[task_id]
+                logger.info(f"移除任务: {task_id}")
+                return True
         return False
     
-    def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+    async def get_task(self, task_id: str) -> Optional[Task]:
         """获取任务信息"""
-        task = self._tasks.get(task_id)
-        if not task:
-            return None
-        
-        return {
-            "task_id": task.task_id,
-            "description": task.description,
-            "interval": task.interval,
-            "next_run": datetime.fromtimestamp(task.next_run).isoformat(),
-            "last_run": datetime.fromtimestamp(task.last_run).isoformat() if task.last_run else None,
-            "run_count": task.run_count,
-            "is_enabled": task.is_enabled
-        }
+        async with self._task_lock:
+            return self._tasks.get(task_id)
     
-    def get_all_tasks(self) -> List[Dict[str, Any]]:
-        """获取所有任务信息"""
-        return [self.get_task(task_id) for task_id in self._tasks]
+    async def get_all_tasks(self) -> Dict[str, Task]:
+        """获取所有任务"""
+        async with self._task_lock:
+            return self._tasks.copy()
     
-    def enable_task(self, task_id: str) -> bool:
+    async def enable_task(self, task_id: str) -> bool:
         """启用任务"""
-        if task_id in self._tasks:
-            self._tasks[task_id].is_enabled = True
-            logger.info(f"启用任务: {task_id}")
-            return True
+        async with self._task_lock:
+            if task_id in self._tasks:
+                self._tasks[task_id].is_enabled = True
+                logger.info(f"启用任务: {task_id}")
+                return True
         return False
     
-    def disable_task(self, task_id: str) -> bool:
+    async def disable_task(self, task_id: str) -> bool:
         """禁用任务"""
-        if task_id in self._tasks:
-            self._tasks[task_id].is_enabled = False
-            logger.info(f"禁用任务: {task_id}")
-            return True
+        async with self._task_lock:
+            if task_id in self._tasks:
+                self._tasks[task_id].is_enabled = False
+                logger.info(f"禁用任务: {task_id}")
+                return True
         return False
     
     def update_task_interval(self, task_id: str, interval: int) -> bool:
@@ -146,50 +146,78 @@ class SchedulerService:
             logger.error(f"任务执行出错: {task_id} - {str(e)}")
             return False
     
-    async def _run_scheduler(self):
-        """运行调度器"""
-        self._running = True
-        logger.info("启动调度器")
-        
-        while self._running:
-            current_time = time.time()
-            
-            # 查找需要运行的任务
-            for task_id, task in self._tasks.items():
-                if not task.is_enabled:
-                    continue
-                
-                if current_time >= task.next_run:
-                    try:
-                        logger.info(f"运行任务: {task_id} - {task.description}")
-                        task.last_result = await task.func(*task.args, **task.kwargs)
-                        task.last_run = current_time
-                        task.run_count += 1
-                        task.next_run = current_time + task.interval
-                        task.last_error = None
-                    except Exception as e:
-                        task.last_error = str(e)
-                        logger.error(f"任务执行出错: {task_id} - {str(e)}")
-                        # 即使出错，也更新下次运行时间
-                        task.next_run = current_time + task.interval
-            
-            # 等待一段时间再检查
-            await asyncio.sleep(1)
-    
-    def start(self):
+    async def start(self):
         """启动调度器"""
-        if not self._running:
+        async with self._lock:
+            if self._running:
+                logger.info("调度器已经在运行中")
+                return
+            
+            self._running = True
+            logger.info("启动调度器")
+            
+            # 创建异步任务
             self._task_loop = asyncio.create_task(self._run_scheduler())
-            logger.info("调度器已启动")
     
-    def stop(self):
+    async def stop(self):
         """停止调度器"""
-        if self._running:
+        async with self._lock:
+            if not self._running:
+                logger.info("调度器未在运行")
+                return
+            
             self._running = False
+            logger.info("停止调度器")
+            
+            # 取消异步任务
             if self._task_loop:
                 self._task_loop.cancel()
-            logger.info("调度器已停止")
+                try:
+                    await self._task_loop
+                except asyncio.CancelledError:
+                    pass
+                self._task_loop = None
     
-    def is_running(self) -> bool:
-        """检查调度器是否运行中"""
-        return self._running 
+    async def _run_scheduler(self):
+        """运行调度器主循环"""
+        logger.info("调度器主循环开始运行")
+        
+        while self._running:
+            try:
+                # 获取当前时间
+                now = time.time()
+                
+                # 查找需要执行的任务
+                tasks_to_run = []
+                async with self._task_lock:
+                    for task_id, task in self._tasks.items():
+                        if task.is_enabled and task.next_run <= now:
+                            tasks_to_run.append(task)
+                            # 更新下次运行时间
+                            task.next_run = now + task.interval
+                
+                # 执行任务
+                for task in tasks_to_run:
+                    asyncio.create_task(self._execute_task(task))
+                
+                # 等待一段时间
+                await asyncio.sleep(1)
+            except Exception as e:
+                logger.error(f"调度器运行出错: {str(e)}")
+                await asyncio.sleep(5)  # 出错后等待较长时间
+    
+    async def _execute_task(self, task: Task):
+        """执行任务"""
+        task.last_run = time.time()
+        task.run_count += 1
+        
+        try:
+            # 执行任务函数
+            result = await task.func(*task.args, **task.kwargs)
+            task.last_result = result
+            logger.info(f"任务执行成功: {task.task_id} - {task.description}")
+            return result
+        except Exception as e:
+            task.last_error = str(e)
+            logger.error(f"任务执行失败: {task.task_id} - {task.description} - {str(e)}")
+            return None 

@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Any, List, Optional
 import os
+import asyncio
 
 from app.core.config import settings
 from app.schemas.stock import AIAnalysis
@@ -30,6 +31,10 @@ class MLService:
         except Exception as e:
             print(f"加载模型时出错: {str(e)}")
     
+    async def _run_sync(self, func, *args, **kwargs):
+        """在线程池中运行同步函数"""
+        return await asyncio.to_thread(func, *args, **kwargs)
+    
     async def analyze_stock(
         self, 
         symbol: str, 
@@ -44,28 +49,39 @@ class MLService:
                 return None
             
             # 准备特征
-            features = self._prepare_features(historical_data, technical_indicators)
+            features = await self._run_sync(self._prepare_features, historical_data, technical_indicators)
             
             # 标准化特征
             scaler = self.model_data['scaler']
-            X_scaled = scaler.transform([features])
+            X_scaled = await self._run_sync(scaler.transform, [features])
             
             # 预测
             trend_model = self.model_data['trend_model']
             risk_model = self.model_data['risk_model']
             sentiment_model = self.model_data['sentiment_model']
             
-            trend_pred = trend_model.predict(X_scaled)[0]
-            risk_pred = risk_model.predict(X_scaled)[0]
-            sentiment_pred = sentiment_model.predict(X_scaled)[0]
+            trend_pred = await self._run_sync(trend_model.predict, X_scaled)
+            trend_pred = trend_pred[0]
+            
+            risk_pred = await self._run_sync(risk_model.predict, X_scaled)
+            risk_pred = risk_pred[0]
+            
+            sentiment_pred = await self._run_sync(sentiment_model.predict, X_scaled)
+            sentiment_pred = sentiment_pred[0]
             
             # 获取预测概率
-            trend_proba = trend_model.predict_proba(X_scaled)[0]
-            risk_proba = risk_model.predict_proba(X_scaled)[0]
-            sentiment_proba = sentiment_model.predict_proba(X_scaled)[0]
+            trend_proba = await self._run_sync(trend_model.predict_proba, X_scaled)
+            trend_proba = trend_proba[0].tolist()
+            
+            risk_proba = await self._run_sync(risk_model.predict_proba, X_scaled)
+            risk_proba = risk_proba[0].tolist()
+            
+            sentiment_proba = await self._run_sync(sentiment_model.predict_proba, X_scaled)
+            sentiment_proba = sentiment_proba[0].tolist()
             
             # 生成分析结果
-            analysis = self._generate_analysis(
+            analysis = await self._run_sync(
+                self._generate_analysis,
                 symbol,
                 historical_data,
                 fundamentals,
@@ -80,7 +96,7 @@ class MLService:
             
             return analysis
         except Exception as e:
-            print(f"机器学习分析股票时出错: {str(e)}")
+            print(f"分析股票时出错: {str(e)}")
             return None
     
     def _prepare_features(
