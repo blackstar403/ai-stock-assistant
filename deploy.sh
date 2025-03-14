@@ -87,7 +87,7 @@ build_and_start() {
     
     if [ $? -eq 0 ]; then
         print_message "服务启动成功 ✓"
-        print_message "后端API: http://localhost:8000/api/docs"
+        print_message "后端API: http://localhost:8000/api/v1/docs"
         print_message "前端界面: http://localhost:3000"
     else
         print_error "服务启动失败，请检查日志"

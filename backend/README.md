@@ -92,7 +92,7 @@ uvicorn app.main:app --reload
 ### 股票搜索
 
 ```
-GET /api/stocks/search?q={query}&data_source={data_source}
+GET /api/v1/stocks/search?q={query}&data_source={data_source}
 ```
 
 参数：
@@ -115,7 +115,7 @@ GET /api/stocks/search?q={query}&data_source={data_source}
 ### 股票信息
 
 ```
-GET /api/stocks/{symbol}?data_source={data_source}
+GET /api/v1/stocks/{symbol}?data_source={data_source}
 ```
 
 参数：
@@ -140,7 +140,7 @@ GET /api/stocks/{symbol}?data_source={data_source}
 ### 股票历史数据
 
 ```
-GET /api/stocks/{symbol}/history?interval={interval}&data_source={data_source}
+GET /api/v1/stocks/{symbol}/history?interval={interval}&data_source={data_source}
 ```
 
 参数：
@@ -166,7 +166,7 @@ GET /api/stocks/{symbol}/history?interval={interval}&data_source={data_source}
 ### 股票 AI 分析
 
 ```
-GET /api/stocks/{symbol}/analysis?data_source={data_source}&analysis_mode={analysis_mode}
+GET /api/v1/stocks/{symbol}/analysis?data_source={data_source}&analysis_mode={analysis_mode}
 ```
 
 参数：
@@ -211,9 +211,9 @@ DEFAULT_DATA_SOURCE=alphavantage  # 可选值: alphavantage, tushare, akshare
 在 API 请求中可以通过 `data_source` 参数指定使用的数据源：
 
 ```
-GET /api/stocks/search?q=apple&data_source=alphavantage
-GET /api/stocks/000001.SZ?data_source=tushare
-GET /api/stocks/600000.SH/history?data_source=akshare
+GET /api/v1/stocks/search?q=apple&data_source=alphavantage
+GET /api/v1/stocks/000001.SZ?data_source=tushare
+GET /api/v1/stocks/600000.SH/history?data_source=akshare
 ```
 
 ## 多种分析模式
@@ -237,9 +237,9 @@ DEFAULT_ANALYSIS_MODE=rule  # 可选值: rule, ml, llm
 在 API 请求中可以通过 `analysis_mode` 参数指定使用的分析模式：
 
 ```
-GET /api/stocks/AAPL/analysis?analysis_mode=rule
-GET /api/stocks/000001.SZ/analysis?analysis_mode=ml
-GET /api/stocks/600000.SH/analysis?analysis_mode=llm
+GET /api/v1/stocks/AAPL/analysis?analysis_mode=rule
+GET /api/v1/stocks/000001.SZ/analysis?analysis_mode=ml
+GET /api/v1/stocks/600000.SH/analysis?analysis_mode=llm
 ```
 
 ### 分析模式特点

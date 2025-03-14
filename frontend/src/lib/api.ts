@@ -3,7 +3,7 @@ import { StockInfo, StockPriceHistory, AIAnalysis, ApiResponse, CacheStats, Task
 import { indexedDBCache } from './indexedDBCache';
 
 // API基础URL，优先使用环境变量，否则使用相对路径
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
 // 开发环境下输出API基础URL，帮助调试
 if (process.env.NODE_ENV !== 'production') {

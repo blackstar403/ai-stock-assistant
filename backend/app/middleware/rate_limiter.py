@@ -88,11 +88,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not _limiters:
             _limiters = {
                 "default": RateLimiter(settings.RATE_LIMIT_DEFAULT_MINUTE),
-                "/api/stocks/search": RateLimiter(settings.RATE_LIMIT_SEARCH_MINUTE),
-                "/api/stocks/": RateLimiter(settings.RATE_LIMIT_STOCK_INFO_MINUTE),
-                "/api/stocks/analysis": RateLimiter(settings.RATE_LIMIT_AI_ANALYSIS_MINUTE),
-                "/api/ai/": RateLimiter(settings.RATE_LIMIT_AI_ANALYSIS_MINUTE),
-                "/api/tasks/": RateLimiter(settings.RATE_LIMIT_TASK_MINUTE),
+                "/api/v1/stocks/search": RateLimiter(settings.RATE_LIMIT_SEARCH_MINUTE),
+                "/api/v1/stocks/": RateLimiter(settings.RATE_LIMIT_STOCK_INFO_MINUTE),
+                "/api/v1/stocks/analysis": RateLimiter(settings.RATE_LIMIT_AI_ANALYSIS_MINUTE),
+                "/api/v1/ai/": RateLimiter(settings.RATE_LIMIT_AI_ANALYSIS_MINUTE),
+                "/api/v1/tasks/": RateLimiter(settings.RATE_LIMIT_TASK_MINUTE),
             }
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:

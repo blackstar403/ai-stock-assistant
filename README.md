@@ -76,7 +76,7 @@ cd ai-stock-assistant
 ```
 
 3. 访问应用
-- 后端 API 文档：http://localhost:8000/api/docs
+- 后端 API 文档：http://localhost:8000/api/v1/docs
 - 前端界面：http://localhost:3000
 
 ### 方法二：手动安装（适合喜欢折腾的朋友）
