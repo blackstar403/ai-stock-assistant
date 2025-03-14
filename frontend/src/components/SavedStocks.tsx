@@ -81,10 +81,10 @@ export default function SavedStocks({ onSelectStock }: SavedStocksProps) {
   };
 
   return (
-    <Card className="w-full h-full overflow-hidden transition-all duration-300 hover:shadow-md">
+    <Card className="w-full h-full overflow-hidden transition-all duration-300">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-xl flex items-center">
-          <Bookmark className="mr-2 h-5 w-5" />
+          <Bookmark className="mr-2 h-5 w-5 text-primary" />
           收藏的股票
         </CardTitle>
         <TooltipProvider>
@@ -107,7 +107,7 @@ export default function SavedStocks({ onSelectStock }: SavedStocksProps) {
       </CardHeader>
       <CardContent>
         {error && (
-          <div className="p-3 mb-3 bg-red-50 border border-red-200 rounded-md flex items-center text-red-600 text-sm">
+          <div className="p-3 mb-3 bg-red-500/10 border border-red-500/20 rounded-md flex items-center text-red-500 text-sm">
             <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
             {error}
           </div>
@@ -123,7 +123,7 @@ export default function SavedStocks({ onSelectStock }: SavedStocksProps) {
           </div>
         ) : savedStocks.length === 0 ? (
           <div className="py-8 text-center">
-            <div className="bg-slate-50 p-4 rounded-md">
+            <div className="bg-secondary/50 p-4 rounded-md">
               <Bookmark className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
               <p className="text-muted-foreground">暂无收藏的股票</p>
               <p className="text-xs text-muted-foreground mt-2">
@@ -136,8 +136,8 @@ export default function SavedStocks({ onSelectStock }: SavedStocksProps) {
             {savedStocks.map((stock) => (
               <li 
                 key={stock.symbol} 
-                className={`py-3 px-2 rounded-md transition-colors duration-200 hover:bg-slate-50 cursor-pointer ${
-                  selectedSymbol === stock.symbol ? 'bg-blue-50 border-l-2 border-blue-500 pl-2' : ''
+                className={`py-3 px-2 rounded-md transition-colors duration-200 hover:bg-secondary/30 cursor-pointer ${
+                  selectedSymbol === stock.symbol ? 'bg-primary/10 border-l-2 border-primary pl-2' : ''
                 }`}
                 onClick={() => handleSelectStock(stock.symbol)}
               >
@@ -157,7 +157,7 @@ export default function SavedStocks({ onSelectStock }: SavedStocksProps) {
                       添加于: {formatDate(stock.addedAt)}
                     </div>
                     {stock.notes && (
-                      <div className="text-sm mt-1 text-muted-foreground bg-slate-50 p-1 rounded">
+                      <div className="text-sm mt-1 text-muted-foreground bg-secondary/50 p-1 rounded">
                         <Info className="h-3 w-3 inline mr-1" />
                         {stock.notes}
                       </div>
@@ -171,7 +171,7 @@ export default function SavedStocks({ onSelectStock }: SavedStocksProps) {
                             variant="ghost"
                             size="sm"
                             onClick={(e) => handleDelete(stock.symbol, e)}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-100 mr-1"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-500/10 mr-1"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

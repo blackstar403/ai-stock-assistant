@@ -37,7 +37,7 @@ const CardTitle = React.forwardRef<HTMLHeadingElement, CardTitleProps>(
     return (
       <h3
         ref={ref}
-        className={`text-lg font-semibold leading-none tracking-tight ${className}`}
+        className={`text-lg font-semibold leading-none tracking-tight text-foreground ${className}`}
         {...props}
       />
     );
@@ -86,4 +86,4 @@ const CardFooter = React.forwardRef<HTMLDivElement, CardFooterProps>(
 );
 CardFooter.displayName = 'CardFooter';
 
-export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }; 
+export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter };

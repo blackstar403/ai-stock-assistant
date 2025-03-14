@@ -152,9 +152,9 @@ export default function StockDetail({ symbol }: StockDetailProps) {
   const industryTags = ['科技', '互联网', '软件服务'];
 
   return (
-    <Card className="w-full shadow-sm">
+    <Card className="w-full">
       {loading && (
-        <CardContent className="p-3">
+        <CardContent className="p-4">
           <div className="flex justify-between">
             <Skeleton className="h-7 w-28" />
             <Skeleton className="h-7 w-20" />
@@ -169,7 +169,7 @@ export default function StockDetail({ symbol }: StockDetailProps) {
       )}
       
       {error && (
-        <CardContent className="p-3 text-center">
+        <CardContent className="p-4 text-center">
           <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-3" />
           <div className="text-red-500 font-medium mb-2">{error}</div>
           <Button 
@@ -185,8 +185,8 @@ export default function StockDetail({ symbol }: StockDetailProps) {
       )}
       
       {!loading && !error && stockInfo && (
-        <CardContent className="p-3">
-          <div className="flex justify-between items-start mb-3 pb-2 border-b border-border">
+        <CardContent className="p-4">
+          <div className="flex justify-between items-start mb-4 pb-3 border-b border-border">
             <div>
               <div className="flex items-center">
                 <span className="text-lg font-semibold">{stockInfo.symbol}</span>
@@ -196,10 +196,10 @@ export default function StockDetail({ symbol }: StockDetailProps) {
                   </Badge>
                 )}
               </div>
-              <div className="text-sm mt-1">{stockInfo.name}</div>
+              <div className="text-sm mt-1 text-foreground">{stockInfo.name}</div>
               <div className="flex flex-wrap gap-1 mt-1">
                 {industryTags.map((tag, index) => (
-                  <Badge key={index} variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                  <Badge key={index} variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20">
                     {tag}
                   </Badge>
                 ))}
@@ -253,34 +253,34 @@ export default function StockDetail({ symbol }: StockDetailProps) {
           </div>
           
           <TooltipProvider>
-            <div className="grid grid-cols-4 gap-2 mb-3">
-              <div className="bg-slate-50 rounded p-2">
+            <div className="grid grid-cols-4 gap-3 mb-4">
+              <div className="bg-secondary/50 rounded-md p-3">
                 <div className="text-xs text-muted-foreground">市值</div>
-                <div className="font-medium text-sm">
+                <div className="font-medium text-sm mt-1">
                   {formatMarketCap(stockInfo.marketCap)}
                 </div>
               </div>
               
-              <div className="bg-slate-50 rounded p-2">
+              <div className="bg-secondary/50 rounded-md p-3">
                 <div className="text-xs text-muted-foreground">成交量</div>
-                <div className="font-medium text-sm">
+                <div className="font-medium text-sm mt-1">
                   {stockInfo.volume ? formatNumber(stockInfo.volume, 0) : '-'}
                 </div>
               </div>
               
               {stockInfo.pe && (
-                <div className="bg-slate-50 rounded p-2">
+                <div className="bg-secondary/50 rounded-md p-3">
                   <div className="text-xs text-muted-foreground">市盈率</div>
-                  <div className="font-medium text-sm">
+                  <div className="font-medium text-sm mt-1">
                     {formatNumber(stockInfo.pe)}
                   </div>
                 </div>
               )}
               
               {stockInfo.dividend && (
-                <div className="bg-slate-50 rounded p-2">
+                <div className="bg-secondary/50 rounded-md p-3">
                   <div className="text-xs text-muted-foreground">股息率</div>
-                  <div className="font-medium text-sm">
+                  <div className="font-medium text-sm mt-1">
                     {formatNumber(stockInfo.dividend)}%
                   </div>
                 </div>
@@ -294,14 +294,14 @@ export default function StockDetail({ symbol }: StockDetailProps) {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               disabled={isSaved}
-              className="flex-1 h-8 text-sm"
+              className="flex-1 h-9 text-sm"
               id="stock-notes"
               name="stock-notes"
             />
             {isSaved ? (
               <Button
                 onClick={handleRemoveStock}
-                className="h-8 min-w-[80px] px-2 bg-red-500 hover:bg-red-600"
+                className="h-9 min-w-[80px] px-2 bg-red-500 hover:bg-red-600 text-white"
                 disabled={removing}
                 size="sm"
               >
@@ -311,7 +311,7 @@ export default function StockDetail({ symbol }: StockDetailProps) {
             ) : (
               <Button
                 onClick={handleSaveStock}
-                className="h-8 min-w-[80px] px-2"
+                className="h-9 min-w-[80px] px-2"
                 disabled={savingNotes}
                 size="sm"
               >

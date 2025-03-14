@@ -67,6 +67,43 @@ export default function StockChart({ symbol }: StockChartProps) {
     loadPriceHistory();
   }, [loadPriceHistory]);
 
+  // 检测当前主题是否为暗色模式
+  const isDarkMode = () => {
+    if (typeof window !== 'undefined') {
+      return document.documentElement.getAttribute('data-theme') === 'dark' || 
+             (window.matchMedia('(prefers-color-scheme: dark)').matches && 
+              !document.documentElement.hasAttribute('data-theme'));
+    }
+    return false;
+  };
+
+  // 获取图表颜色
+  const getChartColors = () => {
+    if (!priceHistory || priceHistory.data.length === 0) {
+      return {
+        line: 'var(--primary)',
+        volumeUp: isDarkMode() ? 'rgba(74, 222, 128, 0.7)' : 'rgba(16, 185, 129, 0.7)',
+        volumeDown: isDarkMode() ? 'rgba(248, 113, 113, 0.7)' : 'rgba(239, 68, 68, 0.7)',
+        grid: isDarkMode() ? 'rgba(255, 255, 255, 0.1)' : 'var(--border)',
+        text: isDarkMode() ? 'rgba(255, 255, 255, 0.7)' : 'var(--muted-foreground)'
+      };
+    }
+    
+    const firstPrice = priceHistory.data[0].close;
+    const lastPrice = priceHistory.data[priceHistory.data.length - 1].close;
+    const isPositive = lastPrice >= firstPrice;
+    
+    return {
+      line: isPositive 
+        ? (isDarkMode() ? 'rgba(74, 222, 128, 1)' : 'var(--green-500, #10b981)') 
+        : (isDarkMode() ? 'rgba(248, 113, 113, 1)' : 'var(--red-500, #ef4444)'),
+      volumeUp: isDarkMode() ? 'rgba(74, 222, 128, 0.7)' : 'rgba(16, 185, 129, 0.7)',
+      volumeDown: isDarkMode() ? 'rgba(248, 113, 113, 0.7)' : 'rgba(239, 68, 68, 0.7)',
+      grid: isDarkMode() ? 'rgba(255, 255, 255, 0.1)' : 'var(--border)',
+      text: isDarkMode() ? 'rgba(255, 255, 255, 0.7)' : 'var(--muted-foreground)'
+    };
+  };
+
   // 自定义工具提示内容
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -91,8 +128,8 @@ export default function StockChart({ symbol }: StockChartProps) {
       };
       
       return (
-        <div className="bg-white p-2 border border-border rounded-md shadow-md text-xs">
-          <div className="font-medium border-b pb-1 mb-1">{formattedDate}</div>
+        <div className="bg-card p-3 border border-border rounded-md shadow-md text-xs">
+          <div className="font-medium border-b border-border pb-1 mb-1">{formattedDate}</div>
           <div className="grid grid-cols-2 gap-x-3 gap-y-1">
             <div>
               <span className="text-muted-foreground">开盘: </span>
@@ -129,21 +166,11 @@ export default function StockChart({ symbol }: StockChartProps) {
     return null;
   };
 
-  // 获取图表颜色
-  const getChartColor = () => {
-    if (!priceHistory || priceHistory.data.length === 0) return 'var(--primary)';
-    
-    const firstPrice = priceHistory.data[0].close;
-    const lastPrice = priceHistory.data[priceHistory.data.length - 1].close;
-    
-    return lastPrice >= firstPrice ? 'var(--green-500, #10b981)' : 'var(--red-500, #ef4444)';
-  };
-
   // 渲染图表
   const renderChart = (): React.ReactElement | null => {
     if (!priceHistory || priceHistory.data.length === 0) return null;
     
-    const chartColor = getChartColor();
+    const colors = getChartColors();
     
     // 为每个数据点添加涨跌标记
     const dataWithTrend = priceHistory.data.map((item, index, array) => {
@@ -163,30 +190,30 @@ export default function StockChart({ symbol }: StockChartProps) {
         data={dataWithTrend}
         margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+        <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
         <XAxis
           dataKey="date"
-          tick={{ fontSize: 10 }}
+          tick={{ fontSize: 10, fill: colors.text }}
           tickFormatter={(value) => {
             const date = new Date(value);
             return `${date.getMonth() + 1}/${date.getDate()}`;
           }}
-          stroke="var(--muted-foreground)"
+          stroke={colors.text}
         />
         <YAxis
           yAxisId="left"
           domain={['auto', 'auto']}
-          tick={{ fontSize: 10 }}
+          tick={{ fontSize: 10, fill: colors.text }}
           tickFormatter={(value) => value.toFixed(0)}
-          stroke="var(--muted-foreground)"
+          stroke={colors.text}
         />
         <YAxis
           yAxisId="right"
           orientation="right"
           domain={['auto', 'auto']}
-          tick={{ fontSize: 10 }}
+          tick={{ fontSize: 10, fill: colors.text }}
           tickFormatter={(value) => (value / 1000000).toFixed(0) + 'M'}
-          stroke="var(--muted-foreground)"
+          stroke={colors.text}
         />
         <RechartsTooltip content={<CustomTooltip />} />
         <Line
@@ -194,7 +221,7 @@ export default function StockChart({ symbol }: StockChartProps) {
           type="monotone"
           dataKey="close"
           name="收盘价"
-          stroke={chartColor}
+          stroke={colors.line}
           dot={false}
           activeDot={{ r: 4 }}
           strokeWidth={2}
@@ -204,7 +231,7 @@ export default function StockChart({ symbol }: StockChartProps) {
           yAxisId="right"
           dataKey="volumeRising"
           name="成交量(上涨)"
-          fill="var(--green-500, #10b981)"
+          fill={colors.volumeUp}
           opacity={0.7}
           stackId="volume"
         />
@@ -213,7 +240,7 @@ export default function StockChart({ symbol }: StockChartProps) {
           yAxisId="right"
           dataKey="volumeFalling"
           name="成交量(下跌)"
-          fill="var(--red-500, #ef4444)"
+          fill={colors.volumeDown}
           opacity={0.7}
           stackId="volume"
         />
@@ -222,86 +249,63 @@ export default function StockChart({ symbol }: StockChartProps) {
   };
 
   return (
-    <Card className="w-full shadow-sm">
-      <CardContent className="p-3">
-        <div className="flex justify-between items-center mb-3">
-          <div className="flex items-center text-sm font-medium">
-            <TrendingUp className="mr-1 h-4 w-4" />
+    <Card className="w-full">
+      <CardContent className="p-4">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center text-base font-medium">
+            <TrendingUp className="mr-2 h-5 w-5 text-primary" />
             价格与成交量
           </div>
           <Button 
-            variant="ghost" 
+            variant="outline" 
             size="sm" 
             onClick={() => loadPriceHistory(true)}
             disabled={loading}
-            className="h-7 px-2"
+            className="h-8 px-3"
           >
-            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+            刷新
           </Button>
         </div>
         
-        <div className="flex flex-wrap gap-1 mb-3">
-          <div className="flex ml-auto">
-            <Badge 
-              variant={timeRange === '1m' ? 'secondary' : 'outline'} 
-              className="rounded-md cursor-pointer mr-1 text-xs"
-              onClick={() => setTimeRange('1m')}
-            >
-              1月
-            </Badge>
-            <Badge 
-              variant={timeRange === '3m' ? 'secondary' : 'outline'} 
-              className="rounded-md cursor-pointer mr-1 text-xs"
-              onClick={() => setTimeRange('3m')}
-            >
-              3月
-            </Badge>
-            <Badge 
-              variant={timeRange === '6m' ? 'secondary' : 'outline'} 
-              className="rounded-md cursor-pointer mr-1 text-xs"
-              onClick={() => setTimeRange('6m')}
-            >
-              6月
-            </Badge>
-            <Badge 
-              variant={timeRange === '1y' ? 'secondary' : 'outline'} 
-              className="rounded-md cursor-pointer mr-1 text-xs"
-              onClick={() => setTimeRange('1y')}
-            >
-              1年
-            </Badge>
-            <Badge 
-              variant={timeRange === '5y' ? 'secondary' : 'outline'} 
-              className="rounded-md cursor-pointer text-xs"
-              onClick={() => setTimeRange('5y')}
-            >
-              5年
-            </Badge>
+        <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex flex-wrap gap-1 ml-auto">
+            {[
+              { value: '1m', label: '1月' },
+              { value: '3m', label: '3月' },
+              { value: '6m', label: '6月' },
+              { value: '1y', label: '1年' },
+              { value: '5y', label: '5年' }
+            ].map((item) => (
+              <Button
+                key={item.value}
+                variant={timeRange === item.value ? 'secondary' : 'outline'}
+                size="sm"
+                onClick={() => setTimeRange(item.value as TimeRange)}
+                className="h-8 px-2 text-xs"
+              >
+                {item.label}
+              </Button>
+            ))}
           </div>
         </div>
         
-        <div className="flex mb-3">
-          <Badge 
-            variant={interval === 'daily' ? 'secondary' : 'outline'} 
-            className="rounded-md cursor-pointer mr-1 text-xs"
-            onClick={() => setInterval('daily')}
-          >
-            日K
-          </Badge>
-          <Badge 
-            variant={interval === 'weekly' ? 'secondary' : 'outline'} 
-            className="rounded-md cursor-pointer mr-1 text-xs"
-            onClick={() => setInterval('weekly')}
-          >
-            周K
-          </Badge>
-          <Badge 
-            variant={interval === 'monthly' ? 'secondary' : 'outline'} 
-            className="rounded-md cursor-pointer text-xs"
-            onClick={() => setInterval('monthly')}
-          >
-            月K
-          </Badge>
+        <div className="flex mb-4">
+          {[
+            { value: 'daily', label: '日K' },
+            { value: 'weekly', label: '周K' },
+            { value: 'monthly', label: '月K' }
+          ].map((item) => (
+            <Button
+              key={item.value}
+              variant={interval === item.value ? 'secondary' : 'outline'}
+              size="sm"
+              onClick={() => setInterval(item.value as Interval)}
+              className="h-8 px-2 text-xs mr-2"
+            >
+              {item.label}
+            </Button>
+          ))}
         </div>
         
         {loading && (
@@ -327,7 +331,7 @@ export default function StockChart({ symbol }: StockChartProps) {
         )}
         
         {!loading && !error && priceHistory && priceHistory.data.length > 0 && (
-          <div className="h-60">
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               {renderChart() || <div>No chart data available</div>}
             </ResponsiveContainer>

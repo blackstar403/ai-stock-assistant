@@ -23,14 +23,14 @@ async def update_stock_data_with_db(symbol: str = None):
 async def get_all_tasks():
     """获取所有定时任务"""
     scheduler = SchedulerService()
-    tasks = scheduler.get_all_tasks()
+    tasks = await scheduler.get_all_tasks()
     return api_response(data=tasks)
 
 @router.get("/{task_id}", response_model=dict)
 async def get_task(task_id: str):
     """获取特定定时任务"""
     scheduler = SchedulerService()
-    task = scheduler.get_task(task_id)
+    task = await scheduler.get_task(task_id)
     if not task:
         return api_response(success=False, error="任务不存在")
     return api_response(data=task)
@@ -45,7 +45,7 @@ async def create_task(task: TaskCreate):
         return api_response(success=False, error="不支持的任务类型")
     
     # 创建任务
-    task_id = scheduler.add_task(
+    task_id = await scheduler.add_task(
         func=update_stock_data_with_db,
         args=[task.symbol] if task.symbol else [],
         interval=task.interval,
@@ -57,7 +57,7 @@ async def create_task(task: TaskCreate):
         return api_response(success=False, error="创建任务失败")
     
     # 获取创建的任务信息
-    new_task = scheduler.get_task(task_id)
+    new_task = await scheduler.get_task(task_id)
     return api_response(data=new_task)
 
 @router.put("/{task_id}", response_model=dict)
@@ -66,11 +66,11 @@ async def update_task(task_id: str, task_update: TaskUpdate):
     scheduler = SchedulerService()
     
     # 检查任务是否存在
-    if not scheduler.get_task(task_id):
+    if not await scheduler.get_task(task_id):
         return api_response(success=False, error="任务不存在")
     
     # 更新任务
-    success = scheduler.update_task(
+    success = await scheduler.update_task(
         task_id=task_id,
         interval=task_update.interval,
         is_enabled=task_update.is_enabled
@@ -80,7 +80,7 @@ async def update_task(task_id: str, task_update: TaskUpdate):
         return api_response(success=False, error="更新任务失败")
     
     # 获取更新后的任务信息
-    updated_task = scheduler.get_task(task_id)
+    updated_task = await scheduler.get_task(task_id)
     return api_response(data=updated_task)
 
 @router.delete("/{task_id}", response_model=dict)
@@ -89,11 +89,11 @@ async def delete_task(task_id: str):
     scheduler = SchedulerService()
     
     # 检查任务是否存在
-    if not scheduler.get_task(task_id):
+    if not await scheduler.get_task(task_id):
         return api_response(success=False, error="任务不存在")
     
     # 删除任务
-    success = scheduler.remove_task(task_id)
+    success = await scheduler.remove_task(task_id)
     
     if not success:
         return api_response(success=False, error="删除任务失败")
@@ -106,7 +106,7 @@ async def run_task_now(task_id: str, background_tasks: BackgroundTasks):
     scheduler = SchedulerService()
     
     # 检查任务是否存在
-    task = scheduler.get_task(task_id)
+    task = await scheduler.get_task(task_id)
     if not task:
         return api_response(success=False, error="任务不存在")
     
