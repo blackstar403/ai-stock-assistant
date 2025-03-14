@@ -259,8 +259,8 @@ def add_technical_indicators(df):
     df['volatility_20'] = df['close'].rolling(window=20).std()
     
     # 布林带
-    df['bollinger_mid'] = df['close'].rolling(window=20).mean()
-    df['bollinger_std'] = df['close'].rolling(window=20).std()
+    df['bollinger_mid'] = df['close'].rolling(window=25).mean() # 25日均线
+    df['bollinger_std'] = df['close'].rolling(window=25).std() # 25日均线标准差 
     df['bollinger_upper'] = df['bollinger_mid'] + 2 * df['bollinger_std']
     df['bollinger_lower'] = df['bollinger_mid'] - 2 * df['bollinger_std']
     

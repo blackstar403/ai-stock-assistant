@@ -591,8 +591,8 @@ class AIService:
         indicators['Price_vs_SMA200'] = current_price / indicators['SMA_200'] - 1  # 正值表示价格在200日均线上方
 
         # 计算布林带指标 (Bollinger Bands)
-        sma_20 = df['close'].rolling(window=20).mean()
-        std_20 = df['close'].rolling(window=20).std()
+        sma_20 = df['close'].rolling(window=25).mean() # 25日均线
+        std_20 = df['close'].rolling(window=25).std() # 25日均线标准差
         indicators['BB_Upper'] = (sma_20 + (std_20 * 2)).iloc[-1]  # 上轨（均线+2倍标准差）
         indicators['BB_Middle'] = sma_20.iloc[-1]  # 中轨（20日均线）
         indicators['BB_Lower'] = (sma_20 - (std_20 * 2)).iloc[-1]  # 下轨（均线-2倍标准差）
