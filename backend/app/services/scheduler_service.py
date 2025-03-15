@@ -35,6 +35,21 @@ class Task:
         self.last_error = None
         self.run_count = 0
 
+    def to_dict(self) -> Dict[str, Any]:
+        """将任务转换为可序列化的字典"""
+        return {
+            "task_id": self.task_id,
+            "interval": self.interval,
+            "next_run": self.next_run,
+            "description": self.description,
+            "is_enabled": self.is_enabled,
+            "last_run": self.last_run,
+            "last_result": str(self.last_result) if self.last_result is not None else None,
+            "last_error": self.last_error,
+            "run_count": self.run_count,
+            # 不包含 func, args, kwargs 因为它们不可序列化
+        }
+
 class SchedulerService:
     """定时任务调度服务"""
     
@@ -91,15 +106,16 @@ class SchedulerService:
                 return True
         return False
     
-    async def get_task(self, task_id: str) -> Optional[Task]:
+    async def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
         """获取任务信息"""
         async with self._task_lock:
-            return self._tasks.get(task_id)
+            task = self._tasks.get(task_id)
+            return task.to_dict() if task else None
     
-    async def get_all_tasks(self) -> Dict[str, Task]:
+    async def get_all_tasks(self) -> Dict[str, Dict[str, Any]]:
         """获取所有任务"""
         async with self._task_lock:
-            return self._tasks.copy()
+            return [task.to_dict() for task_id, task in self._tasks.items()]
     
     async def enable_task(self, task_id: str) -> bool:
         """启用任务"""
