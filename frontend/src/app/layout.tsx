@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AlphaBot - 智能股票分析与投资建议",
+  title: "AlphaBot - 你的智能股票分析助手",
   description: "使用AI技术分析股票市场，提供实时数据、图表和智能投资建议，帮助您做出更明智的投资决策。",
   keywords: "股票分析, AI投资, 股票助手, 智能投资, 股票市场, 投资建议",
 };

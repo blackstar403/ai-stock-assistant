@@ -19,7 +19,7 @@ async def update_stock_data_with_db(symbol: str = None):
     finally:
         db.close()
 
-@router.get("/", response_model=dict)
+@router.get("", response_model=dict)
 async def get_all_tasks():
     """获取所有定时任务"""
     scheduler = SchedulerService()
@@ -35,7 +35,7 @@ async def get_task(task_id: str):
         return api_response(success=False, error="任务不存在")
     return api_response(data=task)
 
-@router.post("/", response_model=dict)
+@router.post("", response_model=dict)
 async def create_task(task: TaskCreate):
     """创建定时任务"""
     scheduler = SchedulerService()
