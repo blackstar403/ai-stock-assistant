@@ -252,13 +252,6 @@ export default function StockChart({ symbol }: StockChartProps) {
   // 处理切换 AI 预测
   const handleToggleAIPrediction = () => {
     setShowAIPrediction(!showAIPrediction);
-    if (!showAIPrediction) {
-      if (interval === 'intraday') {
-        loadIntradayAIAnalysis();
-      } else {
-        loadAIPrediction();
-      }
-    }
   };
 
   // 处理切换分析类型
