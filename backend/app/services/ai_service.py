@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Any, List, Optional
 import random
+import re
 
 from app.core.config import settings
 from app.schemas.stock import AIAnalysis
@@ -680,7 +681,7 @@ class AIService:
         historical_data: pd.DataFrame,
         technical_indicators: Dict[str, float]
     ) -> Dict[str, Any]:
-        """使用规则分析分时数据"""
+        """使用规则分析分时数据并生成GS信号"""
         # 确保数据按日期排序
         historical_data = historical_data.sort_values('date')
         
@@ -698,6 +699,45 @@ class AIService:
         
         # 获取最新数据
         latest_data = historical_data.iloc[-1]
+        
+        # 计算GS信号
+        gs_signal = "中性"
+        
+        # 使用MACD和均线交叉判断GS信号
+        if len(historical_data) >= 2:
+            # 获取当前和前一个交易日的数据
+            current = historical_data.iloc[-1]
+            previous = historical_data.iloc[-2]
+            
+            # MACD金叉（MACD线上穿信号线）
+            macd_golden_cross = macd.iloc[-2] < signal.iloc[-2] and macd.iloc[-1] > signal.iloc[-1]
+            
+            # MACD死叉（MACD线下穿信号线）
+            macd_death_cross = macd.iloc[-2] > signal.iloc[-2] and macd.iloc[-1] < signal.iloc[-1]
+            
+            # 均线金叉（短期均线上穿长期均线）
+            ma_golden_cross = (
+                previous['ma5'] < previous['ma10'] and current['ma5'] > current['ma10']
+            ) or (
+                previous['ma10'] < previous['ma20'] and current['ma10'] > current['ma20']
+            )
+            
+            # 均线死叉（短期均线下穿长期均线）
+            ma_death_cross = (
+                previous['ma5'] > previous['ma10'] and current['ma5'] < current['ma10']
+            ) or (
+                previous['ma10'] > previous['ma20'] and current['ma10'] < current['ma20']
+            )
+            
+            # 判断GS信号
+            if macd_golden_cross or ma_golden_cross:
+                gs_signal = "买入"
+            elif macd_death_cross or ma_death_cross:
+                gs_signal = "卖出"
+            elif current['close'] > current['ma20'] * 1.05:
+                gs_signal = "超买"
+            elif current['close'] < current['ma20'] * 0.95:
+                gs_signal = "超卖"
         
         # 预测未来5个交易日的价格趋势
         price_trend = []
@@ -748,11 +788,7 @@ class AIService:
                 'signal': round(float(signal.iloc[-1]), 2),
                 'histogram': round(float(hist.iloc[-1]), 2)
             },
-            'analysis': {
-                'trend': 'bullish' if technical_indicators.get('rsi', 50) > 50 else 'bearish',
-                'strength': 'strong' if abs(technical_indicators.get('rsi', 50) - 50) > 15 else 'weak',
-                'summary': f"{'看涨' if technical_indicators.get('rsi', 50) > 50 else '看跌'}趋势，{'强' if abs(technical_indicators.get('rsi', 50) - 50) > 15 else '弱'}势。"
-            }
+            'gs_signal': gs_signal  # 添加GS信号
         }
         
         return result
@@ -770,6 +806,59 @@ class AIService:
         # 确保数据按日期排序
         historical_data = historical_data.sort_values('date')
         
+        # 计算GS信号
+        gs_signal = "中性"
+        
+        # 使用MACD和均线交叉判断GS信号
+        if len(historical_data) >= 2:
+            # 计算移动平均线（如果尚未计算）
+            if 'ma5' not in historical_data.columns:
+                historical_data['ma5'] = historical_data['close'].rolling(window=5).mean()
+            if 'ma10' not in historical_data.columns:
+                historical_data['ma10'] = historical_data['close'].rolling(window=10).mean()
+            if 'ma20' not in historical_data.columns:
+                historical_data['ma20'] = historical_data['close'].rolling(window=20).mean()
+            
+            # 计算MACD（如果尚未计算）
+            exp1 = historical_data['close'].ewm(span=12, adjust=False).mean()
+            exp2 = historical_data['close'].ewm(span=26, adjust=False).mean()
+            macd = exp1 - exp2
+            signal = macd.ewm(span=9, adjust=False).mean()
+            
+            # 获取当前和前一个交易日的数据
+            current = historical_data.iloc[-1]
+            previous = historical_data.iloc[-2]
+            
+            # MACD金叉（MACD线上穿信号线）
+            macd_golden_cross = macd.iloc[-2] < signal.iloc[-2] and macd.iloc[-1] > signal.iloc[-1]
+            
+            # MACD死叉（MACD线下穿信号线）
+            macd_death_cross = macd.iloc[-2] > signal.iloc[-2] and macd.iloc[-1] < signal.iloc[-1]
+            
+            # 均线金叉（短期均线上穿长期均线）
+            ma_golden_cross = (
+                previous['ma5'] < previous['ma10'] and current['ma5'] > current['ma10']
+            ) or (
+                previous['ma10'] < previous['ma20'] and current['ma10'] > current['ma20']
+            )
+            
+            # 均线死叉（短期均线下穿长期均线）
+            ma_death_cross = (
+                previous['ma5'] > previous['ma10'] and current['ma5'] < current['ma10']
+            ) or (
+                previous['ma10'] > previous['ma20'] and current['ma10'] < current['ma20']
+            )
+            
+            # 判断GS信号
+            if macd_golden_cross or ma_golden_cross:
+                gs_signal = "买入"
+            elif macd_death_cross or ma_death_cross:
+                gs_signal = "卖出"
+            elif current['close'] > current['ma20'] * 1.05:
+                gs_signal = "超买"
+            elif current['close'] < current['ma20'] * 0.95:
+                gs_signal = "超卖"
+        
         # 使用ML模型预测未来价格
         try:
             # 准备特征
@@ -780,7 +869,7 @@ class AIService:
                 features[indicator] = value
                 
             # 预测未来5个交易日的价格
-            predictions = ml_service.predict_time_series(features, days=5)
+            predictions = await ml_service.predict_time_series(features, days=5)
             
             # 格式化预测结果
             price_trend = []
@@ -806,7 +895,8 @@ class AIService:
                     'trend': 'bullish' if predictions[-1] > historical_data['close'].iloc[-1] else 'bearish',
                     'strength': 'strong' if abs(predictions[-1] - historical_data['close'].iloc[-1]) / historical_data['close'].iloc[-1] > 0.02 else 'weak',
                     'summary': f"ML模型预测{'看涨' if predictions[-1] > historical_data['close'].iloc[-1] else '看跌'}趋势，{'强' if abs(predictions[-1] - historical_data['close'].iloc[-1]) / historical_data['close'].iloc[-1] > 0.02 else '弱'}势。"
-                }
+                },
+                'gs_signal': gs_signal  # 添加GS信号
             }
             
             return result
@@ -834,6 +924,59 @@ class AIService:
             # 转换 DataFrame 为字典列表
             historical_data_dict = historical_data.to_dict('records')
             
+            # 计算GS信号
+            gs_signal = "中性"
+            
+            # 使用MACD和均线交叉判断GS信号
+            if len(historical_data) >= 2:
+                # 计算移动平均线（如果尚未计算）
+                if 'ma5' not in historical_data.columns:
+                    historical_data['ma5'] = historical_data['close'].rolling(window=5).mean()
+                if 'ma10' not in historical_data.columns:
+                    historical_data['ma10'] = historical_data['close'].rolling(window=10).mean()
+                if 'ma20' not in historical_data.columns:
+                    historical_data['ma20'] = historical_data['close'].rolling(window=20).mean()
+                
+                # 计算MACD（如果尚未计算）
+                exp1 = historical_data['close'].ewm(span=12, adjust=False).mean()
+                exp2 = historical_data['close'].ewm(span=26, adjust=False).mean()
+                macd = exp1 - exp2
+                signal = macd.ewm(span=9, adjust=False).mean()
+                
+                # 获取当前和前一个交易日的数据
+                current = historical_data.iloc[-1]
+                previous = historical_data.iloc[-2]
+                
+                # MACD金叉（MACD线上穿信号线）
+                macd_golden_cross = macd.iloc[-2] < signal.iloc[-2] and macd.iloc[-1] > signal.iloc[-1]
+                
+                # MACD死叉（MACD线下穿信号线）
+                macd_death_cross = macd.iloc[-2] > signal.iloc[-2] and macd.iloc[-1] < signal.iloc[-1]
+                
+                # 均线金叉（短期均线上穿长期均线）
+                ma_golden_cross = (
+                    previous['ma5'] < previous['ma10'] and current['ma5'] > current['ma10']
+                ) or (
+                    previous['ma10'] < previous['ma20'] and current['ma10'] > current['ma20']
+                )
+                
+                # 均线死叉（短期均线下穿长期均线）
+                ma_death_cross = (
+                    previous['ma5'] > previous['ma10'] and current['ma5'] < current['ma10']
+                ) or (
+                    previous['ma10'] > previous['ma20'] and current['ma10'] < current['ma20']
+                )
+                
+                # 判断GS信号
+                if macd_golden_cross or ma_golden_cross:
+                    gs_signal = "买入"
+                elif macd_death_cross or ma_death_cross:
+                    gs_signal = "卖出"
+                elif current['close'] > current['ma20'] * 1.05:
+                    gs_signal = "超买"
+                elif current['close'] < current['ma20'] * 0.95:
+                    gs_signal = "超卖"
+            
             # 调用 OpenAI 服务分析时间序列
             analysis_result = await openai_service.analyze_stock_time_series(
                 symbol,
@@ -845,6 +988,9 @@ class AIService:
             # 添加技术指标
             if 'indicators' not in analysis_result:
                 analysis_result['indicators'] = {k: round(float(v), 2) for k, v in technical_indicators.items()}
+            
+            # 添加GS信号
+            analysis_result['gs_signal'] = gs_signal
             
             return analysis_result
                 
@@ -1084,7 +1230,7 @@ class AIService:
         intraday_data: pd.DataFrame,
         technical_indicators: Dict[str, float]
     ) -> Dict[str, Any]:
-        """使用规则分析分时数据"""
+        """使用规则分析分时数据并生成AI分时高低信号"""
         try:
             # 获取技术指标
             rsi = technical_indicators.get('rsi', 50)
@@ -1110,25 +1256,34 @@ class AIService:
                 strength = "strong"
             elif abs(price_change) < 1:
                 strength = "weak"
+
+            # 将 stock_info 转换为字典
+            if not isinstance(stock_info, dict):
+                try:
+                    # 如果是可转换为字典的对象（如ORM模型），尝试转换
+                    stock_info = dict(stock_info)
+                except (TypeError, ValueError):
+                    # 如果无法转换，创建一个只包含股票代码的新字典
+                    stock_info = {"symbol": symbol}
             
             # 生成分析摘要
             summary = ""
             if trend == "bullish":
                 if latest_price > upper_band:
-                    summary = f"{stock_info.name}分时走势强劲上涨，价格突破布林带上轨，可能出现超买。"
+                    summary = f"{stock_info.get('name', symbol)}分时走势强劲上涨，价格突破布林带上轨，可能出现超买。"
                 elif latest_price > ma5 and ma5 > ma10:
-                    summary = f"{stock_info.name}分时走势向上，短期均线上穿中期均线，呈现多头排列。"
+                    summary = f"{stock_info.get('name', symbol)}分时走势向上，短期均线上穿中期均线，呈现多头排列。"
                 else:
-                    summary = f"{stock_info.name}分时走势偏强，价格上涨{price_change:.2f}%。"
+                    summary = f"{stock_info.get('name', symbol)}分时走势偏强，价格上涨{price_change:.2f}%。"
             elif trend == "bearish":
                 if latest_price < lower_band:
-                    summary = f"{stock_info.name}分时走势明显下跌，价格跌破布林带下轨，可能出现超卖。"
+                    summary = f"{stock_info.get('name', symbol)}分时走势明显下跌，价格跌破布林带下轨，可能出现超卖。"
                 elif latest_price < ma5 and ma5 < ma10:
-                    summary = f"{stock_info.name}分时走势向下，短期均线下穿中期均线，呈现空头排列。"
+                    summary = f"{stock_info.get('name', symbol)}分时走势向下，短期均线下穿中期均线，呈现空头排列。"
                 else:
-                    summary = f"{stock_info.name}分时走势偏弱，价格下跌{abs(price_change):.2f}%。"
+                    summary = f"{stock_info.get('name', symbol)}分时走势偏弱，价格下跌{abs(price_change):.2f}%。"
             else:
-                summary = f"{stock_info.name}分时走势震荡，价格变化不大，处于盘整阶段。"
+                summary = f"{stock_info.get('name', symbol)}分时走势震荡，价格变化不大，处于盘整阶段。"
             
             # 添加成交量分析
             if volume_change > 20:
@@ -1142,17 +1297,57 @@ class AIService:
             elif rsi < 30:
                 summary += f" RSI为{rsi:.2f}，处于超卖区域，可能出现反弹。"
             
+            # 计算AI分时高低信号
+            intraday_high_signal = None
+            intraday_low_signal = None
+            
+            # 如果有足够的数据点
+            if len(intraday_data) >= 30:
+                # 获取最近的价格数据
+                recent_data = intraday_data.tail(30)
+                
+                # 计算当前价格与近期高点和低点的关系
+                recent_high = recent_data['price'].max() if 'price' in recent_data.columns else 0
+                recent_low = recent_data['price'].min() if 'price' in recent_data.columns else 0
+                
+                # 计算价格波动范围
+                price_range = recent_high - recent_low
+                
+                # 如果价格接近近期高点（距离小于波动范围的10%）
+                if price_range > 0 and (recent_high - latest_price) < price_range * 0.1:
+                    intraday_high_signal = {
+                        "price": round(float(recent_high), 2),
+                        "confidence": "high" if rsi > 70 else "medium",
+                        "time": str(recent_data.iloc[recent_data['price'].argmax()]['time']) if 'price' in recent_data.columns and 'time' in recent_data.columns else None
+                    }
+                
+                # 如果价格接近近期低点（距离小于波动范围的10%）
+                if price_range > 0 and (latest_price - recent_low) < price_range * 0.1:
+                    intraday_low_signal = {
+                        "price": round(float(recent_low), 2),
+                        "confidence": "high" if rsi < 30 else "medium",
+                        "time": str(recent_data.iloc[recent_data['price'].argmin()]['time']) if 'price' in recent_data.columns and 'time' in recent_data.columns else None
+                    }
+            
             return {
                 "trend": trend,
                 "strength": strength,
-                "summary": summary
+                "summary": summary,
+                "intraday_signals": {
+                    "high": intraday_high_signal,
+                    "low": intraday_low_signal
+                }
             }
         except Exception as e:
-            print(f"规则分析分时数据时出错: {str(e)}")
+            print(f"分析分时数据时出错: {str(e)}")
             return {
                 "trend": "neutral",
                 "strength": "medium",
-                "summary": f"{stock_info.get('name', symbol)}分时数据分析失败。"
+                "summary": f"无法分析{symbol}的分时数据。",
+                "intraday_signals": {
+                    "high": None,
+                    "low": None
+                }
             }
     
     @staticmethod
@@ -1170,8 +1365,8 @@ class AIService:
             # 准备特征数据
             features = pd.DataFrame([technical_indicators])
             
-            # 使用ML模型预测趋势
-            trend_proba = ml_service.predict_trend_probability(features)
+            # 使用ML模型预测趋势 - 添加 await 关键字
+            trend_proba = await ml_service.predict_trend_probability(features)
             
             # 确定趋势和强度
             if trend_proba > 0.6:
@@ -1183,10 +1378,21 @@ class AIService:
             else:
                 trend = "neutral"
                 strength = "medium"
+
+            # 将 stock_info 转换为字典
+            if not isinstance(stock_info, dict):
+                try:
+                    # 如果是可转换为字典的对象（如ORM模型），尝试转换
+                    stock_info = dict(stock_info)
+                except (TypeError, ValueError):
+                    # 如果无法转换，创建一个只包含股票代码的新字典
+                    stock_info = {"symbol": symbol} 
             
             # 生成分析摘要
             price_change = technical_indicators.get('price_change_percent', 0)
             volume_change = technical_indicators.get('volume_change_percent', 0)
+            rsi = technical_indicators.get('rsi', 50)
+            latest_price = technical_indicators.get('latest_price', 0)
             
             summary = f"{stock_info.get('name', symbol)}分时数据机器学习分析显示，"
             
@@ -1207,19 +1413,52 @@ class AIService:
             elif volume_change < -20:
                 summary += f" 成交量明显萎缩，减少{abs(volume_change):.2f}%，交投清淡。"
             
+            # 计算AI分时高低信号
+            intraday_high_signal = None
+            intraday_low_signal = None
+            
+            # 如果有足够的数据点
+            if len(intraday_data) >= 30:
+                # 获取最近的价格数据
+                recent_data = intraday_data.tail(30)
+                
+                # 计算当前价格与近期高点和低点的关系
+                recent_high = recent_data['price'].max() if 'price' in recent_data.columns else 0
+                recent_low = recent_data['price'].min() if 'price' in recent_data.columns else 0
+                
+                # 计算价格波动范围
+                price_range = recent_high - recent_low
+                
+                # 如果价格接近近期高点（距离小于波动范围的10%）
+                if price_range > 0 and (recent_high - latest_price) < price_range * 0.1:
+                    intraday_high_signal = {
+                        "price": round(float(recent_high), 2),
+                        "confidence": "high" if rsi > 70 else "medium",
+                        "time": str(recent_data.iloc[recent_data['price'].argmax()]['time']) if 'price' in recent_data.columns and 'time' in recent_data.columns else None
+                    }
+                
+                # 如果价格接近近期低点（距离小于波动范围的10%）
+                if price_range > 0 and (latest_price - recent_low) < price_range * 0.1:
+                    intraday_low_signal = {
+                        "price": round(float(recent_low), 2),
+                        "confidence": "high" if rsi < 30 else "medium",
+                        "time": str(recent_data.iloc[recent_data['price'].argmin()]['time']) if 'price' in recent_data.columns and 'time' in recent_data.columns else None
+                    }
+            
             return {
                 "trend": trend,
                 "strength": strength,
                 "summary": summary,
-                "trend_probability": trend_proba
+                "trend_probability": trend_proba,
+                "intraday_signals": {
+                    "high": intraday_high_signal,
+                    "low": intraday_low_signal
+                }
             }
         except Exception as e:
             print(f"机器学习分析分时数据时出错: {str(e)}")
-            return {
-                "trend": "neutral",
-                "strength": "medium",
-                "summary": f"{stock_info.get('name', symbol)}分时数据机器学习分析失败。"
-            }
+            # 如果ML分析失败，回退到规则分析
+            return await AIService._analyze_intraday_with_rule(symbol, stock_info, intraday_data, technical_indicators)
     
     @staticmethod
     async def _analyze_intraday_with_llm(
@@ -1235,9 +1474,6 @@ class AIService:
             
             # 将 stock_info 转换为字典
             if not isinstance(stock_info, dict):
-                print("--------------------33------------")
-                print(stock_info)
-                print("--------------------------------")   
                 try:
                     # 如果是可转换为字典的对象（如ORM模型），尝试转换
                     stock_info = dict(stock_info)
@@ -1303,22 +1539,56 @@ class AIService:
                 strength = "weak"
             
             # 提取摘要
-            summary_start = response.find("分析摘要:") if "分析摘要:" in response else response.find("分析摘要：")
-            if summary_start != -1:
-                summary = response[summary_start + 5:].strip()
+            summary_match = re.search(r'分析摘要:(.*?)(?:\n|$)', response, re.DOTALL | re.IGNORECASE)
+            if summary_match:
+                summary = summary_match.group(1).strip()
             else:
-                # 如果找不到摘要标记，使用整个响应
+                # 如果没有找到格式化的摘要，使用整个响应
                 summary = response.strip()
+            
+            # 计算AI分时高低信号
+            intraday_high_signal = None
+            intraday_low_signal = None
+            
+            # 如果有足够的数据点
+            if len(intraday_data) >= 30:
+                # 获取最近的价格数据
+                recent_data = intraday_data.tail(30)
+                
+                # 计算当前价格与近期高点和低点的关系
+                recent_high = recent_data['price'].max() if 'price' in recent_data.columns else 0
+                recent_low = recent_data['price'].min() if 'price' in recent_data.columns else 0
+                
+                # 计算价格波动范围
+                price_range = recent_high - recent_low
+                
+                # 如果价格接近近期高点（距离小于波动范围的10%）
+                if price_range > 0 and (recent_high - latest_price) < price_range * 0.1:
+                    intraday_high_signal = {
+                        "price": round(float(recent_high), 2),
+                        "confidence": "high" if rsi > 70 else "medium",
+                        "time": str(recent_data.iloc[recent_data['price'].argmax()]['time']) if 'price' in recent_data.columns and 'time' in recent_data.columns else None
+                    }
+                
+                # 如果价格接近近期低点（距离小于波动范围的10%）
+                if price_range > 0 and (latest_price - recent_low) < price_range * 0.1:
+                    intraday_low_signal = {
+                        "price": round(float(recent_low), 2),
+                        "confidence": "high" if rsi < 30 else "medium",
+                        "time": str(recent_data.iloc[recent_data['price'].argmin()]['time']) if 'price' in recent_data.columns and 'time' in recent_data.columns else None
+                    }
             
             return {
                 "trend": trend,
                 "strength": strength,
-                "summary": summary
+                "summary": summary,
+                "intraday_signals": {
+                    "high": intraday_high_signal,
+                    "low": intraday_low_signal
+                }
             }
+            
         except Exception as e:
-            print(f"LLM分析分时数据时出错: {str(e)}")
-            return {
-                "trend": "neutral",
-                "strength": "medium",
-                "summary": f"{stock_info.get('name', symbol)}分时数据LLM分析失败。"
-            } 
+            print(f"Error in LLM intraday analysis: {str(e)}")
+            # 如果LLM分析失败，回退到规则分析
+            return await AIService._analyze_intraday_with_rule(symbol, stock_info, intraday_data, technical_indicators) 

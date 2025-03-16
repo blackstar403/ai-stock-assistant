@@ -304,4 +304,72 @@ class MLService:
             current_price = current_price * (1 + change)
             predictions.append(current_price)
             
-        return predictions 
+        return predictions
+
+    async def predict_trend_probability(
+        self, 
+        features: pd.DataFrame,
+        symbol: str = None, 
+        historical_data: pd.DataFrame = None
+    ) -> Dict[str, Any]:
+        """预测股票趋势概率
+        
+        Args:
+            features: 包含技术指标的DataFrame或技术指标字典
+            symbol: 可选的股票代码
+            historical_data: 可选的历史价格数据
+            
+        Returns:
+            包含趋势预测概率的字典或概率值
+        """
+        try:
+            if self.model_data is None:
+                print("模型未加载，无法预测趋势概率")
+                return 0.5  # 返回中性概率
+            
+            # 处理不同类型的输入
+            if isinstance(features, pd.DataFrame):
+                # 如果输入是DataFrame，直接使用
+                X = features.values.astype(float)
+            elif isinstance(features, dict):
+                # 如果输入是技术指标字典，转换为特征列表
+                if historical_data is not None:
+                    X = np.array([self._prepare_features(historical_data, features)])
+                else:
+                    # 如果没有历史数据，直接使用字典值
+                    X = np.array([[v for v in features.values()]])
+            else:
+                raise ValueError("不支持的特征类型")
+            
+            # 标准化特征
+            scaler = self.model_data.get('scaler')
+            if scaler:
+                X_scaled = scaler.transform(X)
+            else:
+                X_scaled = X
+            
+            # 预测趋势概率
+            trend_model = self.model_data['trend_model']
+            trend_proba = await self._run_sync(trend_model.predict_proba, X_scaled)
+            
+            # 获取看涨概率
+            bullish_proba = trend_proba[0][1] if len(trend_proba[0]) > 1 else 0.5
+            
+            # 如果是从ai_service.py的_analyze_intraday_with_ml调用，直接返回概率值
+            if historical_data is None and symbol is None:
+                return bullish_proba
+            
+            # 否则返回完整的结果字典
+            return {
+                "trend": "bullish" if bullish_proba > 0.5 else "bearish",
+                "probability": {
+                    "bearish": 1.0 - bullish_proba,
+                    "bullish": bullish_proba
+                }
+            }
+        except Exception as e:
+            print(f"预测趋势概率时出错: {str(e)}")
+            # 出错时返回中性概率
+            if historical_data is None and symbol is None:
+                return 0.5
+            return {"error": str(e)} 

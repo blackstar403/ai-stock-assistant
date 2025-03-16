@@ -264,8 +264,21 @@ export default function StockChart({ symbol }: StockChartProps) {
   // 处理切换分析类型
   const handleChangeAnalysisType = (type: AnalysisType) => {
     setAnalysisType(type);
-    if (showAIPrediction && interval !== 'intraday') {
-      loadAIPrediction(true);
+    if (showAIPrediction) {
+      try {
+        if (interval === 'intraday') {
+          loadIntradayAIAnalysis(true);
+        } else {
+          loadAIPrediction(true);
+        }
+      } catch (err) {
+        console.error(`加载${type}分析时出错:`, err);
+        if (interval === 'intraday') {
+          setIntradayAIError(`${type}分析模型不可用，请尝试其他分析类型`);
+        } else {
+          setAIError(`${type}分析模型不可用，请尝试其他分析类型`);
+        }
+      }
     }
   };
 
@@ -683,7 +696,7 @@ export default function StockChart({ symbol }: StockChartProps) {
 
   // 渲染 AI 分析类型选择
   const renderAITypeControls = () => {
-    if (!showAIPrediction || interval === 'intraday') {
+    if (!showAIPrediction) {
       return null;
     }
     
@@ -693,7 +706,7 @@ export default function StockChart({ symbol }: StockChartProps) {
           variant={analysisType === 'rule' ? 'primary' : 'outline'}
           size="sm"
           onClick={() => handleChangeAnalysisType('rule')}
-          disabled={aiLoading}
+          disabled={interval === 'intraday' ? intradayAILoading : aiLoading}
         >
           规则分析
         </Button>
@@ -701,7 +714,7 @@ export default function StockChart({ symbol }: StockChartProps) {
           variant={analysisType === 'ml' ? 'primary' : 'outline'}
           size="sm"
           onClick={() => handleChangeAnalysisType('ml')}
-          disabled={aiLoading}
+          disabled={interval === 'intraday' ? intradayAILoading : aiLoading}
         >
           ML分析
         </Button>
@@ -709,7 +722,7 @@ export default function StockChart({ symbol }: StockChartProps) {
           variant={analysisType === 'llm' ? 'primary' : 'outline'}
           size="sm"
           onClick={() => handleChangeAnalysisType('llm')}
-          disabled={aiLoading}
+          disabled={interval === 'intraday' ? intradayAILoading : aiLoading}
         >
           LLM分析
         </Button>
