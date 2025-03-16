@@ -614,3 +614,241 @@ class AIService:
         indicators['MACD'] = macd.iloc[-1]
         
         return indicators 
+
+    @staticmethod
+    async def analyze_time_series(
+        symbol: str,
+        interval: str = "daily",
+        range: str = "1m",
+        data_source: str = None,
+        analysis_mode: str = None
+    ) -> Optional[Dict[str, Any]]:
+        """分析股票分时数据并生成 AI 预测和分析"""
+        try:
+            # 如果未指定分析模式，使用默认模式
+            if analysis_mode is None:
+                analysis_mode = settings.DEFAULT_ANALYSIS_MODE
+                
+            # 获取数据源
+            data_source_instance = DataSourceFactory.get_data_source(data_source)
+            
+            # 获取股票信息
+            stock_info = await data_source_instance.get_stock_info(symbol)
+            if not stock_info:
+                return None
+                
+            # 获取历史价格数据
+            price_history = await data_source_instance.get_stock_price_history(symbol, interval, range)
+            if not price_history or not price_history.data or len(price_history.data) == 0:
+                return None
+                
+            # 转换为 pandas DataFrame 进行分析
+            historical_data = pd.DataFrame([
+                {
+                    'date': point.date,
+                    'open': point.open,
+                    'high': point.high,
+                    'low': point.low,
+                    'close': point.close,
+                    'volume': point.volume
+                }
+                for point in price_history.data
+            ])
+            
+            # 计算技术指标
+            technical_indicators = AIService._calculate_technical_indicators(historical_data)
+            
+            # 根据分析模式选择分析方法
+            if analysis_mode == "rule":
+                time_series_analysis = await AIService._analyze_time_series_with_rule(historical_data, technical_indicators)
+            elif analysis_mode == "ml":
+                time_series_analysis = await AIService._analyze_time_series_with_ml(symbol, historical_data, technical_indicators)
+            elif analysis_mode == "llm":
+                time_series_analysis = await AIService._analyze_time_series_with_llm(symbol, stock_info, historical_data, technical_indicators)
+            else:
+                # 默认使用规则分析
+                time_series_analysis = await AIService._analyze_time_series_with_rule(historical_data, technical_indicators)
+                
+            return time_series_analysis
+            
+        except Exception as e:
+            print(f"Error analyzing time series for {symbol}: {str(e)}")
+            return None
+            
+    @staticmethod
+    async def _analyze_time_series_with_rule(
+        historical_data: pd.DataFrame,
+        technical_indicators: Dict[str, float]
+    ) -> Dict[str, Any]:
+        """使用规则分析分时数据"""
+        # 确保数据按日期排序
+        historical_data = historical_data.sort_values('date')
+        
+        # 计算移动平均线
+        historical_data['ma5'] = historical_data['close'].rolling(window=5).mean()
+        historical_data['ma10'] = historical_data['close'].rolling(window=10).mean()
+        historical_data['ma20'] = historical_data['close'].rolling(window=20).mean()
+        
+        # 计算MACD
+        exp1 = historical_data['close'].ewm(span=12, adjust=False).mean()
+        exp2 = historical_data['close'].ewm(span=26, adjust=False).mean()
+        macd = exp1 - exp2
+        signal = macd.ewm(span=9, adjust=False).mean()
+        hist = macd - signal
+        
+        # 获取最新数据
+        latest_data = historical_data.iloc[-1]
+        
+        # 预测未来5个交易日的价格趋势
+        price_trend = []
+        last_close = latest_data['close']
+        
+        # 简单线性预测
+        for i in range(1, 6):
+            # 使用简单的线性回归预测
+            if len(historical_data) >= 5:
+                recent_data = historical_data.tail(5)
+                avg_change = (recent_data['close'].iloc[-1] - recent_data['close'].iloc[0]) / 4
+                predicted_price = last_close + (avg_change * i)
+                price_trend.append({
+                    'day': i,
+                    'predicted_price': round(float(predicted_price), 2)
+                })
+        
+        # 生成支撑位和阻力位
+        support_levels = []
+        resistance_levels = []
+        
+        # 简单方法：使用最近低点作为支撑位，最近高点作为阻力位
+        if len(historical_data) >= 10:
+            recent_data = historical_data.tail(10)
+            min_price = recent_data['low'].min()
+            max_price = recent_data['high'].max()
+            
+            # 添加支撑位
+            support_levels.append(round(float(min_price), 2))
+            support_levels.append(round(float(min_price * 0.98), 2))
+            
+            # 添加阻力位
+            resistance_levels.append(round(float(max_price), 2))
+            resistance_levels.append(round(float(max_price * 1.02), 2))
+        
+        # 生成分析结果
+        result = {
+            'prediction': {
+                'price_trend': price_trend,
+                'support_levels': support_levels,
+                'resistance_levels': resistance_levels
+            },
+            'indicators': {
+                'ma5': round(float(latest_data['ma5'] if not pd.isna(latest_data['ma5']) else 0), 2),
+                'ma10': round(float(latest_data['ma10'] if not pd.isna(latest_data['ma10']) else 0), 2),
+                'ma20': round(float(latest_data['ma20'] if not pd.isna(latest_data['ma20']) else 0), 2),
+                'macd': round(float(macd.iloc[-1]), 2),
+                'signal': round(float(signal.iloc[-1]), 2),
+                'histogram': round(float(hist.iloc[-1]), 2)
+            },
+            'analysis': {
+                'trend': 'bullish' if technical_indicators.get('rsi', 50) > 50 else 'bearish',
+                'strength': 'strong' if abs(technical_indicators.get('rsi', 50) - 50) > 15 else 'weak',
+                'summary': f"{'看涨' if technical_indicators.get('rsi', 50) > 50 else '看跌'}趋势，{'强' if abs(technical_indicators.get('rsi', 50) - 50) > 15 else '弱'}势。"
+            }
+        }
+        
+        return result
+        
+    @staticmethod
+    async def _analyze_time_series_with_ml(
+        symbol: str,
+        historical_data: pd.DataFrame,
+        technical_indicators: Dict[str, float]
+    ) -> Dict[str, Any]:
+        """使用机器学习分析分时数据"""
+        # 获取ML服务实例
+        ml_service = AIService.get_ml_service()
+        
+        # 确保数据按日期排序
+        historical_data = historical_data.sort_values('date')
+        
+        # 使用ML模型预测未来价格
+        try:
+            # 准备特征
+            features = historical_data[['open', 'high', 'low', 'close', 'volume']].copy()
+            
+            # 添加技术指标作为特征
+            for indicator, value in technical_indicators.items():
+                features[indicator] = value
+                
+            # 预测未来5个交易日的价格
+            predictions = ml_service.predict_time_series(features, days=5)
+            
+            # 格式化预测结果
+            price_trend = []
+            for i, price in enumerate(predictions):
+                price_trend.append({
+                    'day': i + 1,
+                    'predicted_price': round(float(price), 2)
+                })
+                
+            # 计算支撑位和阻力位
+            support_level = round(float(min(predictions) * 0.98), 2)
+            resistance_level = round(float(max(predictions) * 1.02), 2)
+            
+            # 生成分析结果
+            result = {
+                'prediction': {
+                    'price_trend': price_trend,
+                    'support_levels': [support_level],
+                    'resistance_levels': [resistance_level]
+                },
+                'indicators': technical_indicators,
+                'analysis': {
+                    'trend': 'bullish' if predictions[-1] > historical_data['close'].iloc[-1] else 'bearish',
+                    'strength': 'strong' if abs(predictions[-1] - historical_data['close'].iloc[-1]) / historical_data['close'].iloc[-1] > 0.02 else 'weak',
+                    'summary': f"ML模型预测{'看涨' if predictions[-1] > historical_data['close'].iloc[-1] else '看跌'}趋势，{'强' if abs(predictions[-1] - historical_data['close'].iloc[-1]) / historical_data['close'].iloc[-1] > 0.02 else '弱'}势。"
+                }
+            }
+            
+            return result
+            
+        except Exception as e:
+            print(f"Error in ML time series analysis: {str(e)}")
+            # 如果ML分析失败，回退到规则分析
+            return await AIService._analyze_time_series_with_rule(historical_data, technical_indicators)
+            
+    @staticmethod
+    async def _analyze_time_series_with_llm(
+        symbol: str,
+        stock_info: Dict[str, Any],
+        historical_data: pd.DataFrame,
+        technical_indicators: Dict[str, float]
+    ) -> Dict[str, Any]:
+        """使用大语言模型分析分时数据"""
+        try:
+            # 获取OpenAI服务实例
+            openai_service = AIService.get_openai_service()
+            
+            # 确保数据按日期排序
+            historical_data = historical_data.sort_values('date')
+            
+            # 转换 DataFrame 为字典列表
+            historical_data_dict = historical_data.to_dict('records')
+            
+            # 调用 OpenAI 服务分析时间序列
+            analysis_result = await openai_service.analyze_stock_time_series(
+                symbol,
+                stock_info,
+                historical_data_dict,
+                technical_indicators
+            )
+            
+            # 添加技术指标
+            if 'indicators' not in analysis_result:
+                analysis_result['indicators'] = {k: round(float(v), 2) for k, v in technical_indicators.items()}
+            
+            return analysis_result
+                
+        except Exception as e:
+            print(f"Error in LLM time series analysis: {str(e)}")
+            # 如果LLM分析失败，回退到规则分析
+            return await AIService._analyze_time_series_with_rule(historical_data, technical_indicators) 

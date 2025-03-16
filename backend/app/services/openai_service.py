@@ -2,9 +2,12 @@
 OpenAI 服务，用于与 OpenAI API 交互
 """
 
-from openai import AsyncOpenAI
-from typing import Dict, Any, List, Optional
+import os
 import json
+import asyncio
+from typing import Dict, Any, List, Optional
+import openai
+from openai import AsyncOpenAI
 
 from app.core.config import settings
 
@@ -13,12 +16,127 @@ class OpenAIService:
     
     def __init__(self):
         """初始化 OpenAI 客户端"""
-        self.client = AsyncOpenAI(
-            api_key=settings.OPENAI_API_KEY,
-            base_url=settings.OPENAI_API_BASE
-        )
+        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = settings.OPENAI_MODEL
+        self.max_tokens = settings.OPENAI_MAX_TOKENS
+        self.temperature = settings.OPENAI_TEMPERATURE
     
+    async def get_completion(self, prompt: str) -> str:
+        """获取 OpenAI 补全结果
+        
+        Args:
+            prompt: 提示文本
+            
+        Returns:
+            OpenAI 生成的补全文本
+        """
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "你是一位专业的股票分析师，擅长分析股票数据并提供专业的见解。"},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=self.max_tokens,
+                temperature=self.temperature
+            )
+            
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"OpenAI API 调用出错: {str(e)}")
+            return ""
+    
+    async def analyze_stock_time_series(
+        self, 
+        symbol: str,
+        stock_info: Dict[str, Any],
+        historical_data: List[Dict[str, Any]],
+        technical_indicators: Dict[str, float]
+    ) -> Dict[str, Any]:
+        """分析股票时间序列数据
+        
+        Args:
+            symbol: 股票代码
+            stock_info: 股票基本信息
+            historical_data: 历史价格数据
+            technical_indicators: 技术指标
+            
+        Returns:
+            分析结果
+        """
+        # 准备最近的价格数据
+        recent_data = historical_data[-10:] if len(historical_data) >= 10 else historical_data
+        recent_data_str = "\n".join([
+            f"日期: {row['date']}, 开盘: {row['open']}, 最高: {row['high']}, 最低: {row['low']}, 收盘: {row['close']}, 成交量: {row['volume']}"
+            for row in recent_data
+        ])
+        
+        # 准备技术指标数据
+        indicators_str = "\n".join([f"{k}: {v}" for k, v in technical_indicators.items()])
+        
+        # 构建提示
+        prompt = f"""
+        你是一位专业的股票分析师，请根据以下信息分析股票 {symbol} ({stock_info.name}) 的分时数据，并预测未来趋势：
+        
+        最近的价格数据：
+        {recent_data_str}
+        
+        技术指标：
+        {indicators_str}
+        
+        请提供以下分析：
+        1. 未来5个交易日的价格预测
+        2. 支撑位和阻力位
+        3. 趋势分析（看涨/看跌）及强度
+        4. 简短的分析总结
+        
+        请以JSON格式返回，格式如下：
+        {{
+            "prediction": {{
+                "price_trend": [
+                    {{"day": 1, "predicted_price": 价格}},
+                    ...
+                ],
+                "support_levels": [支撑位1, 支撑位2, ...],
+                "resistance_levels": [阻力位1, 阻力位2, ...]
+            }},
+            "analysis": {{
+                "trend": "bullish或bearish",
+                "strength": "strong或weak",
+                "summary": "分析总结"
+            }}
+        }}
+        """
+        
+        # 调用 OpenAI API
+        response_text = await self.get_completion(prompt)
+        
+        # 解析 JSON 响应
+        try:
+            result = json.loads(response_text)
+            return result
+        except json.JSONDecodeError:
+            print(f"无法解析 OpenAI 响应为 JSON: {response_text}")
+            
+            # 返回默认分析结果
+            last_close = historical_data[-1]['close'] if historical_data else 100.0
+            
+            return {
+                "prediction": {
+                    "price_trend": [
+                        {"day": i+1, "predicted_price": last_close * (1 + 0.01 * i)} 
+                        for i in range(5)
+                    ],
+                    "support_levels": [last_close * 0.95, last_close * 0.90],
+                    "resistance_levels": [last_close * 1.05, last_close * 1.10]
+                },
+                "analysis": {
+                    "trend": "neutral",
+                    "strength": "weak",
+                    "summary": "无法生成分析，请稍后再试。"
+                }
+            }
+
     async def analyze_stock(
         self, 
         symbol: str, 

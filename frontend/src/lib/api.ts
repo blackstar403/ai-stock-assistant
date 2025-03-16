@@ -261,6 +261,55 @@ export async function getAIAnalysis(
   }
 }
 
+// 获取AI时间序列分析
+export async function getAITimeSeriesAnalysis(
+  symbol: string,
+  interval: 'daily' | 'weekly' | 'monthly' = 'daily',
+  range: '1m' | '3m' | '6m' | '1y' | '5y' = '1m',
+  forceRefresh: boolean = false,
+  analysisType: 'rule' | 'ml' | 'llm' = 'llm'
+): Promise<ApiResponse<any>> {
+  try {
+    // 缓存键
+    const cacheKey = `ai_time_series_${symbol}_${interval}_${range}_${analysisType}`;
+    
+    // 如果不强制刷新，尝试从缓存获取
+    if (!forceRefresh) {
+      const cachedData = await indexedDBCache.get(cacheKey);
+      if (cachedData) {
+        return {
+          success: true,
+          data: cachedData,
+          message: "从缓存获取AI分时分析"
+        };
+      }
+    }
+    
+    // 构建请求参数
+    const params = new URLSearchParams();
+    params.append('symbol', symbol);
+    params.append('interval', interval);
+    params.append('range', range);
+    if (analysisType) params.append('analysis_type', analysisType);
+    
+    // 发送请求
+    const response = await api.get(`/ai/time-series?${params.toString()}`);
+    
+    // 如果请求成功，缓存结果
+    if (response.data.success && response.data.data) {
+      await indexedDBCache.set(cacheKey, response.data.data, 60 * 30); // 缓存30分钟
+    }
+    
+    return response.data;
+  } catch (error) {
+    console.error('获取AI分时分析失败:', error);
+    return {
+      success: false,
+      error: '获取AI分时分析失败'
+    };
+  }
+}
+
 // 保存股票到收藏夹
 export async function saveStock(symbol: string, notes?: string): Promise<ApiResponse<void>> {
   try {

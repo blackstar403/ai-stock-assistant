@@ -210,4 +210,98 @@ class MLService:
             keyPoints=key_points,
             recommendation=recommendation,
             riskLevel=risk_level
-        ) 
+        )
+
+    def predict_time_series(self, features: pd.DataFrame, days: int = 5) -> List[float]:
+        """预测未来几天的股票价格
+        
+        Args:
+            features: 包含历史价格和技术指标的DataFrame
+            days: 预测未来的天数
+            
+        Returns:
+            未来几天的预测价格列表
+        """
+        try:
+            if self.model_data is None:
+                print("模型未加载，使用简单线性预测")
+                return self._simple_linear_prediction(features, days)
+                
+            # 尝试使用时间序列模型进行预测
+            # 注意：这里假设模型已经包含了时间序列预测功能
+            # 如果实际模型不支持，则回退到简单线性预测
+            if 'time_series_model' in self.model_data:
+                model = self.model_data['time_series_model']
+                
+                # 准备特征
+                X = self._prepare_time_series_features(features)
+                
+                # 预测
+                predictions = model.predict(X, n_periods=days)
+                
+                # 返回预测结果
+                return predictions.tolist()
+            else:
+                # 如果没有时间序列模型，使用简单线性预测
+                return self._simple_linear_prediction(features, days)
+                
+        except Exception as e:
+            print(f"时间序列预测出错: {str(e)}")
+            # 出错时使用简单线性预测
+            return self._simple_linear_prediction(features, days)
+            
+    def _prepare_time_series_features(self, features: pd.DataFrame) -> np.ndarray:
+        """准备时间序列预测的特征
+        
+        Args:
+            features: 包含历史价格和技术指标的DataFrame
+            
+        Returns:
+            用于时间序列预测的特征数组
+        """
+        # 这里根据实际模型需要准备特征
+        # 简单示例：使用最近的收盘价
+        if 'close' in features.columns:
+            return features['close'].values
+        else:
+            raise ValueError("特征中缺少收盘价数据")
+            
+    def _simple_linear_prediction(self, features: pd.DataFrame, days: int = 5) -> List[float]:
+        """使用简单线性回归预测未来价格
+        
+        Args:
+            features: 包含历史价格的DataFrame
+            days: 预测未来的天数
+            
+        Returns:
+            未来几天的预测价格列表
+        """
+        if 'close' not in features.columns:
+            # 如果没有收盘价，返回随机值
+            last_value = 100.0
+            return [last_value * (1 + np.random.normal(0, 0.01)) for _ in range(days)]
+            
+        # 获取最近的收盘价
+        recent_prices = features['close'].tail(10).values
+        
+        if len(recent_prices) < 2:
+            # 数据不足，返回最后一个价格的小幅波动
+            last_price = recent_prices[-1]
+            return [last_price * (1 + np.random.normal(0, 0.01)) for _ in range(days)]
+            
+        # 计算平均变化率
+        changes = np.diff(recent_prices) / recent_prices[:-1]
+        avg_change = np.mean(changes)
+        
+        # 使用平均变化率预测未来价格
+        last_price = recent_prices[-1]
+        predictions = []
+        
+        current_price = last_price
+        for _ in range(days):
+            # 添加一些随机波动
+            change = avg_change + np.random.normal(0, abs(avg_change) * 0.5)
+            current_price = current_price * (1 + change)
+            predictions.append(current_price)
+            
+        return predictions 
