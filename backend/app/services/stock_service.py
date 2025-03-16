@@ -165,4 +165,14 @@ class StockService:
                     return {"success": False, "error": f"获取所有股票时出错: {str(e)}"}
         except Exception as e:
             print(f"更新股票数据时出错: {str(e)}")
-            return {"success": False, "error": f"更新股票数据时出错: {str(e)}"} 
+            return {"success": False, "error": f"更新股票数据时出错: {str(e)}"}
+    
+    @staticmethod
+    async def get_stock_intraday(
+        symbol: str,
+        refresh: bool = False,
+        data_source: str = None
+    ) -> Dict[str, Any]:
+        """获取股票分时数据"""
+        data_source = DataSourceFactory.get_data_source(data_source)
+        return await data_source.get_intraday_data(symbol, refresh) 

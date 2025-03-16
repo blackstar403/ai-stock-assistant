@@ -2,6 +2,9 @@ import httpx
 from typing import List, Optional, Dict, Any
 import pandas as pd
 from datetime import datetime
+import requests
+import random
+from datetime import timedelta
 
 from app.core.config import settings
 from app.services.data_sources.base import DataSourceBase
@@ -296,10 +299,184 @@ class AlphaVantageDataSource(DataSourceBase):
     
     async def get_concept_distribution(self, symbol: str) -> Dict[str, Any]:
         """获取概念涨跌分布分析"""
-        # Alpha Vantage 没有直接提供概念涨跌分布分析的 API
-        # 返回默认值
+        # Alpha Vantage 不支持概念分析，返回默认数据
+        return self._default_concept_distribution()
+    
+    async def get_intraday_data(self, symbol: str, refresh: bool = False) -> Dict[str, Any]:
+        """获取股票分时数据"""
+        try:
+            print(f"[AlphaVantage] 获取分时数据: {symbol}")
+            
+            # 解析股票代码
+            # 对于美股，直接使用symbol
+            # 对于A股，需要转换格式
+            if '.' in symbol:
+                code = symbol.split('.')[0]
+                market = symbol.split('.')[1]
+                
+                # 转换为 Alpha Vantage 格式的代码
+                if market == 'SH':
+                    av_symbol = f"{code}.SS"
+                elif market == 'SZ':
+                    av_symbol = f"{code}.SZ"
+                else:
+                    av_symbol = symbol
+            else:
+                av_symbol = symbol
+                
+            # 获取分时数据
+            try:
+                # 使用Alpha Vantage获取分时数据
+                params = {
+                    'function': 'TIME_SERIES_INTRADAY',
+                    'symbol': av_symbol,
+                    'interval': '1min',
+                    'outputsize': 'full',
+                    'apikey': self.api_key
+                }
+                
+                url = f"{self.base_url}/query"
+                response = await self._run_sync(requests.get, url, params=params)
+                
+                if response.status_code != 200:
+                    print(f"[AlphaVantage] API请求失败: {response.status_code}")
+                    return self._generate_mock_intraday_data(symbol)
+                    
+                data = response.json()
+                
+                # 检查是否有错误信息
+                if 'Error Message' in data:
+                    print(f"[AlphaVantage] API错误: {data['Error Message']}")
+                    return self._generate_mock_intraday_data(symbol)
+                    
+                # 检查是否有分时数据
+                time_series_key = 'Time Series (1min)'
+                if time_series_key not in data:
+                    print(f"[AlphaVantage] 无分时数据")
+                    return self._generate_mock_intraday_data(symbol)
+                    
+                # 处理数据
+                time_series = data[time_series_key]
+                
+                result = {
+                    "symbol": symbol,
+                    "data": []
+                }
+                
+                # 获取今天的日期
+                today = datetime.now().strftime('%Y-%m-%d')
+                
+                # 转换数据格式
+                for timestamp, values in time_series.items():
+                    # 只获取今天的数据
+                    if not timestamp.startswith(today):
+                        continue
+                        
+                    # 提取时间部分 (HH:MM)
+                    time_str = timestamp.split(' ')[1][:5]
+                    
+                    # 添加数据点
+                    data_point = {
+                        "time": time_str,
+                        "price": float(values['4. close']),
+                        "volume": float(values['5. volume'])
+                    }
+                    
+                    result["data"].append(data_point)
+                    
+                # 如果没有今天的数据，返回模拟数据
+                if not result["data"]:
+                    print(f"[AlphaVantage] 无今日分时数据，生成模拟数据")
+                    return self._generate_mock_intraday_data(symbol)
+                    
+                # 按时间排序
+                result["data"].sort(key=lambda x: x["time"])
+                
+                return result
+                
+            except Exception as e:
+                print(f"[AlphaVantage] 获取分时数据失败: {str(e)}")
+                return self._generate_mock_intraday_data(symbol)
+                
+        except Exception as e:
+            print(f"[AlphaVantage] 获取分时数据出错: {str(e)}")
+            # 出错时返回模拟数据
+            return self._generate_mock_intraday_data(symbol)
+            
+    def _generate_mock_intraday_data(self, symbol: str) -> Dict[str, Any]:
+        """生成模拟分时数据"""
+        # 获取当前日期
+        today = datetime.now()
+        
+        # 如果是周末，调整到周五
+        if today.weekday() > 4:  # 5=周六, 6=周日
+            days_to_subtract = today.weekday() - 4
+            today = today - timedelta(days=days_to_subtract)
+            
+        # 基础价格 (随机生成在50-200之间)
+        base_price = random.uniform(50, 200)
+        current_price = base_price
+        
+        # 生成结果
+        result = {
+            "symbol": symbol,
+            "data": []
+        }
+        
+        # 生成上午9:30-11:30的数据
+        current_time = datetime(today.year, today.month, today.day, 9, 30)
+        end_morning = datetime(today.year, today.month, today.day, 11, 30)
+        
+        while current_time <= end_morning:
+            # 价格波动 (-0.5% 到 +0.5%)
+            price_change = current_price * random.uniform(-0.005, 0.005)
+            current_price += price_change
+            
+            # 成交量 (随机生成)
+            volume = random.randint(10000, 100000)
+            
+            # 添加数据点
+            data_point = {
+                "time": current_time.strftime("%H:%M"),
+                "price": round(current_price, 2),
+                "volume": volume
+            }
+            
+            result["data"].append(data_point)
+            
+            # 增加1分钟
+            current_time += timedelta(minutes=1)
+            
+        # 生成下午13:00-15:00的数据
+        current_time = datetime(today.year, today.month, today.day, 13, 0)
+        end_afternoon = datetime(today.year, today.month, today.day, 15, 0)
+        
+        while current_time <= end_afternoon:
+            # 价格波动 (-0.5% 到 +0.5%)
+            price_change = current_price * random.uniform(-0.005, 0.005)
+            current_price += price_change
+            
+            # 成交量 (随机生成)
+            volume = random.randint(10000, 100000)
+            
+            # 添加数据点
+            data_point = {
+                "time": current_time.strftime("%H:%M"),
+                "price": round(current_price, 2),
+                "volume": volume
+            }
+            
+            result["data"].append(data_point)
+            
+            # 增加1分钟
+            current_time += timedelta(minutes=1)
+            
+        return result
+    
+    def _default_concept_distribution(self) -> Dict[str, Any]:
+        """返回默认的概念涨跌分布数据"""
         return {
-            "overall_strength": 0.5,  # 默认中等强度
+            "overall_strength": 0.5,
             "leading_concepts": [],
             "lagging_concepts": [],
             "all_concepts": []

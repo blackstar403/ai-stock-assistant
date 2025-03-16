@@ -587,4 +587,55 @@ export async function runTaskNow(taskId: string): Promise<ApiResponse<any>> {
       error: '运行定时任务时出错',
     };
   }
+}
+
+/**
+ * 获取股票分时数据
+ * @param symbol 股票代码
+ * @param forceRefresh 是否强制刷新缓存
+ * @returns 分时数据响应
+ */
+export async function getStockIntraday(
+  symbol: string,
+  forceRefresh: boolean = false
+): Promise<ApiResponse<any>> {
+  const cacheKey = `getStockIntraday:${symbol}`;
+  
+  // 如果不是强制刷新，尝试从缓存获取
+  if (!forceRefresh) {
+    const cachedResult = await indexedDBCache.get<ApiResponse<any>>(cacheKey);
+    if (cachedResult) {
+      return cachedResult;
+    }
+  }
+  
+  try {
+    const response = await api.get<{success: boolean, data?: any, error?: string}>(
+      `/stocks/${encodeURIComponent(symbol)}/intraday`
+    );
+    
+    // 直接返回后端的响应格式
+    if (response.data && 'success' in response.data) {
+      // 缓存结果（5分钟）
+      await indexedDBCache.set(cacheKey, response.data, 300 * 1000);
+      return response.data;
+    }
+    
+    // 如果响应不符合预期格式，进行转换
+    const result = {
+      success: true,
+      data: response.data as any
+    };
+    
+    // 缓存结果（5分钟）
+    await indexedDBCache.set(cacheKey, result, 300 * 1000);
+    
+    return result;
+  } catch (error) {
+    console.error('获取分时数据出错:', error);
+    return {
+      success: false,
+      error: '获取分时数据时出错',
+    };
+  }
 } 

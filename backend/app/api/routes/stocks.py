@@ -102,3 +102,20 @@ async def update_all_stocks(background_tasks: BackgroundTasks):
     """手动更新所有股票数据"""
     background_tasks.add_task(update_stock_data_with_db)
     return api_response(data={"message": "开始更新所有股票数据"})
+
+@router.get("/{symbol}/intraday", response_model=dict)
+async def get_stock_intraday(
+    symbol: str,
+    refresh: bool = Query(False, description="强制刷新数据，不使用缓存"),
+    data_source: Optional[str] = Query(None, description="数据源: alphavantage, tushare, akshare"),
+    db: Session = Depends(get_db)
+):
+    """获取股票分时数据"""
+    try:
+        intraday_data = await StockService.get_stock_intraday(symbol, refresh, data_source)
+        if not intraday_data:
+            return api_response(success=False, error=f"未找到股票 {symbol} 的分时数据")
+            
+        return api_response(data=intraday_data)
+    except Exception as e:
+        return api_response(success=False, error=f"获取分时数据时出错: {str(e)}")

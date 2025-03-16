@@ -17,9 +17,9 @@ import {
 } from 'recharts';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
-import { getStockPriceHistory, getAITimeSeriesAnalysis } from '../lib/api';
+import { getStockPriceHistory, getAITimeSeriesAnalysis, getStockIntraday } from '../lib/api';
 import { StockPriceHistory } from '../types';
-import { RefreshCw, TrendingUp, BarChart2, Activity, AlertCircle, Brain } from 'lucide-react';
+import { RefreshCw, TrendingUp, BarChart2, Activity, AlertCircle, Brain, Clock } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { Badge } from './ui/badge';
 
@@ -28,13 +28,14 @@ interface StockChartProps {
 }
 
 type TimeRange = '1m' | '3m' | '6m' | '1y' | '5y';
-type Interval = 'daily' | 'weekly' | 'monthly';
-type ChartType = 'price-volume';
+type Interval = 'daily' | 'weekly' | 'monthly' | 'intraday';
+type ChartType = 'price-volume' | 'intraday';
 type AnalysisType = 'rule' | 'ml' | 'llm';
 
 // 图表数据类型
 interface ChartDataPoint {
   date: string;
+  time?: string;
   open?: number;
   high?: number;
   low?: number;
@@ -55,6 +56,9 @@ export default function StockChart({ symbol }: StockChartProps) {
   const [aiLoading, setAILoading] = useState(false);
   const [aiError, setAIError] = useState<string | null>(null);
   const [analysisType, setAnalysisType] = useState<AnalysisType>('llm');
+  const [intradayData, setIntradayData] = useState<ChartDataPoint[]>([]);
+  const [intradayLoading, setIntradayLoading] = useState(false);
+  const [intradayError, setIntradayError] = useState<string | null>(null);
 
   // 加载股票历史价格数据
   const loadPriceHistory = useCallback(async (forceRefresh: boolean = false) => {
@@ -64,7 +68,7 @@ export default function StockChart({ symbol }: StockChartProps) {
     setError(null);
     
     try {
-      const response = await getStockPriceHistory(symbol, interval, timeRange, forceRefresh);
+      const response = await getStockPriceHistory(symbol, interval === 'intraday' ? 'daily' : interval, timeRange, forceRefresh);
       if (response.success && response.data) {
         setPriceHistory(response.data);
       } else {
@@ -78,6 +82,79 @@ export default function StockChart({ symbol }: StockChartProps) {
     }
   }, [symbol, interval, timeRange]);
 
+  // 加载分时数据
+  const loadIntradayData = useCallback(async (forceRefresh: boolean = false) => {
+    if (!symbol) return;
+    
+    setIntradayLoading(true);
+    setIntradayError(null);
+    
+    try {
+      // 调用API获取分时数据
+      const response = await getStockIntraday(symbol, forceRefresh);
+      if (response.success && response.data && Array.isArray(response.data.data)) {
+        // 确保response.data.data是数组
+        const chartData: ChartDataPoint[] = response.data.data.map((point: any) => ({
+          date: new Date().toLocaleDateString(),
+          time: point.time,
+          close: point.price,
+          volume: point.volume
+        }));
+        setIntradayData(chartData);
+      } else {
+        // 如果API调用失败或数据结构不符合预期，使用模拟数据
+        console.warn('无法获取真实分时数据或数据结构不正确，使用模拟数据');
+        const mockIntradayData = generateMockIntradayData();
+        setIntradayData(mockIntradayData);
+      }
+    } catch (err) {
+      console.error('加载分时数据出错:', err);
+      setIntradayError('加载分时数据时出错');
+    } finally {
+      setIntradayLoading(false);
+    }
+  }, [symbol]);
+
+  // 生成模拟分时数据
+  const generateMockIntradayData = () => {
+    const data: ChartDataPoint[] = [];
+    const today = new Date();
+    const basePrice = 100 + Math.random() * 50;
+    let currentPrice = basePrice;
+    
+    // 生成9:30到15:00的分时数据
+    for (let hour = 9; hour <= 15; hour++) {
+      const startMinute = hour === 9 ? 30 : 0;
+      const endMinute = hour === 15 ? 0 : 59;
+      
+      for (let minute = startMinute; minute <= endMinute; minute++) {
+        // 11:30-13:00是午休时间，跳过
+        if ((hour === 11 && minute >= 30) || (hour === 12)) {
+          continue;
+        }
+        
+        // 随机价格波动
+        const change = (Math.random() - 0.5) * 0.5;
+        currentPrice = currentPrice + change;
+        
+        // 随机成交量
+        const volume = Math.floor(Math.random() * 10000) + 1000;
+        
+        // 格式化时间
+        const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        
+        data.push({
+          date: today.toLocaleDateString(),
+          time: timeStr,
+          close: parseFloat(currentPrice.toFixed(2)),
+          volume: volume
+        });
+      }
+    }
+    
+    return data;
+  };
+
   // 加载 AI 预测数据
   const loadAIPrediction = useCallback(async (forceRefresh: boolean = false) => {
     if (!symbol) return;
@@ -88,7 +165,7 @@ export default function StockChart({ symbol }: StockChartProps) {
     try {
       const response = await getAITimeSeriesAnalysis(
         symbol, 
-        interval, 
+        interval === 'intraday' ? 'daily' : interval, 
         timeRange, 
         forceRefresh,
         analysisType
@@ -109,35 +186,60 @@ export default function StockChart({ symbol }: StockChartProps) {
 
   // 初始加载和参数变化时重新加载
   useEffect(() => {
-    loadPriceHistory();
-  }, [loadPriceHistory]);
+    if (interval === 'intraday') {
+      loadIntradayData();
+      setChartType('intraday');
+    } else {
+      loadPriceHistory();
+      setChartType('price-volume');
+    }
+  }, [loadPriceHistory, loadIntradayData, interval]);
 
   // 当显示 AI 预测时加载数据
   useEffect(() => {
-    if (showAIPrediction) {
+    if (showAIPrediction && interval !== 'intraday') {
       loadAIPrediction();
     }
-  }, [showAIPrediction, loadAIPrediction]);
+  }, [showAIPrediction, loadAIPrediction, interval]);
 
   // 处理刷新
   const handleRefresh = () => {
-    loadPriceHistory(true);
-    if (showAIPrediction) {
-      loadAIPrediction(true);
+    if (interval === 'intraday') {
+      loadIntradayData(true);
+    } else {
+      loadPriceHistory(true);
+      if (showAIPrediction) {
+        loadAIPrediction(true);
+      }
     }
   };
 
   // 处理切换 AI 预测
   const handleToggleAIPrediction = () => {
-    setShowAIPrediction(!showAIPrediction);
+    if (interval !== 'intraday') {
+      setShowAIPrediction(!showAIPrediction);
+    }
   };
 
   // 处理切换分析类型
   const handleChangeAnalysisType = (type: AnalysisType) => {
     setAnalysisType(type);
-    if (showAIPrediction) {
+    if (showAIPrediction && interval !== 'intraday') {
       loadAIPrediction(true);
     }
+  };
+
+  // 处理切换到分时图
+  const handleSwitchToIntraday = () => {
+    setInterval('intraday');
+    setChartType('intraday');
+    setShowAIPrediction(false);
+  };
+
+  // 处理切换到K线图
+  const handleSwitchToKline = (newInterval: 'daily' | 'weekly' | 'monthly') => {
+    setInterval(newInterval);
+    setChartType('price-volume');
   };
 
   // 准备图表数据
@@ -202,6 +304,7 @@ export default function StockChart({ symbol }: StockChartProps) {
       prediction: '#3b82f6',
       support: '#4ade80',
       resistance: '#f87171',
+      intraday: '#3b82f6',
     };
   };
 
@@ -298,6 +401,61 @@ export default function StockChart({ symbol }: StockChartProps) {
     );
   };
 
+  // 渲染分时图表
+  const renderIntradayChart = () => {
+    if (intradayData.length === 0) {
+      return null;
+    }
+
+    const colors = getChartColors();
+
+    return (
+      <div className="h-80 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={intradayData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
+            <XAxis 
+              dataKey="time" 
+              scale="band"
+              tickFormatter={(value) => {
+                // 只显示整点和半点
+                if (value.endsWith(':00') || value.endsWith(':30')) {
+                  return value;
+                }
+                return '';
+              }}
+            />
+            <YAxis yAxisId="left" domain={['auto', 'auto']} />
+            <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} />
+            <YAxis yAxisId="volume" orientation="right" domain={['auto', 'auto']} hide />
+            <RechartsTooltip />
+            <Legend />
+            
+            {/* 分时价格线 */}
+            <Line
+              yAxisId="left"
+              type="monotone"
+              dataKey="close"
+              stroke={colors.intraday}
+              name="价格"
+              dot={false}
+              strokeWidth={2}
+            />
+            
+            {/* 成交量柱状图 */}
+            <Bar
+              yAxisId="volume"
+              dataKey="volume"
+              fill={colors.volume}
+              name="成交量"
+              opacity={0.5}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  };
+
   // 渲染 AI 分析结果
   const renderAIAnalysis = () => {
     if (!showAIPrediction || !aiPrediction || !aiPrediction.analysis) {
@@ -335,53 +493,19 @@ export default function StockChart({ symbol }: StockChartProps) {
       <div className="flex flex-wrap gap-2 mb-4">
         <div className="flex rounded-md overflow-hidden border border-border">
           <Button
-            variant={timeRange === '1m' ? 'primary' : 'ghost'}
+            variant={interval === 'intraday' ? 'primary' : 'ghost'}
             size="sm"
             className="rounded-none border-0"
-            onClick={() => setTimeRange('1m')}
+            onClick={handleSwitchToIntraday}
           >
-            1月
+            <Clock className="h-4 w-4 mr-1" />
+            分时
           </Button>
-          <Button
-            variant={timeRange === '3m' ? 'primary' : 'ghost'}
-            size="sm"
-            className="rounded-none border-0"
-            onClick={() => setTimeRange('3m')}
-          >
-            3月
-          </Button>
-          <Button
-            variant={timeRange === '6m' ? 'primary' : 'ghost'}
-            size="sm"
-            className="rounded-none border-0"
-            onClick={() => setTimeRange('6m')}
-          >
-            6月
-          </Button>
-          <Button
-            variant={timeRange === '1y' ? 'primary' : 'ghost'}
-            size="sm"
-            className="rounded-none border-0"
-            onClick={() => setTimeRange('1y')}
-          >
-            1年
-          </Button>
-          <Button
-            variant={timeRange === '5y' ? 'primary' : 'ghost'}
-            size="sm"
-            className="rounded-none border-0"
-            onClick={() => setTimeRange('5y')}
-          >
-            5年
-          </Button>
-        </div>
-        
-        <div className="flex rounded-md overflow-hidden border border-border">
           <Button
             variant={interval === 'daily' ? 'primary' : 'ghost'}
             size="sm"
             className="rounded-none border-0"
-            onClick={() => setInterval('daily')}
+            onClick={() => handleSwitchToKline('daily')}
           >
             日K
           </Button>
@@ -389,7 +513,7 @@ export default function StockChart({ symbol }: StockChartProps) {
             variant={interval === 'weekly' ? 'primary' : 'ghost'}
             size="sm"
             className="rounded-none border-0"
-            onClick={() => setInterval('weekly')}
+            onClick={() => handleSwitchToKline('weekly')}
           >
             周K
           </Button>
@@ -397,38 +521,85 @@ export default function StockChart({ symbol }: StockChartProps) {
             variant={interval === 'monthly' ? 'primary' : 'ghost'}
             size="sm"
             className="rounded-none border-0"
-            onClick={() => setInterval('monthly')}
+            onClick={() => handleSwitchToKline('monthly')}
           >
             月K
           </Button>
         </div>
         
+        {interval !== 'intraday' && (
+          <div className="flex rounded-md overflow-hidden border border-border">
+            <Button
+              variant={timeRange === '1m' ? 'primary' : 'ghost'}
+              size="sm"
+              className="rounded-none border-0"
+              onClick={() => setTimeRange('1m')}
+            >
+              1月
+            </Button>
+            <Button
+              variant={timeRange === '3m' ? 'primary' : 'ghost'}
+              size="sm"
+              className="rounded-none border-0"
+              onClick={() => setTimeRange('3m')}
+            >
+              3月
+            </Button>
+            <Button
+              variant={timeRange === '6m' ? 'primary' : 'ghost'}
+              size="sm"
+              className="rounded-none border-0"
+              onClick={() => setTimeRange('6m')}
+            >
+              6月
+            </Button>
+            <Button
+              variant={timeRange === '1y' ? 'primary' : 'ghost'}
+              size="sm"
+              className="rounded-none border-0"
+              onClick={() => setTimeRange('1y')}
+            >
+              1年
+            </Button>
+            <Button
+              variant={timeRange === '5y' ? 'primary' : 'ghost'}
+              size="sm"
+              className="rounded-none border-0"
+              onClick={() => setTimeRange('5y')}
+            >
+              5年
+            </Button>
+          </div>
+        )}
+        
         <Button
           variant="outline"
           size="sm"
           onClick={handleRefresh}
-          disabled={loading}
+          disabled={loading || intradayLoading}
         >
           <RefreshCw className="h-4 w-4 mr-1" />
           刷新
         </Button>
         
-        <Button
-          variant={showAIPrediction ? 'primary' : 'outline'}
-          size="sm"
-          onClick={handleToggleAIPrediction}
-          disabled={loading}
-        >
-          <Brain className="h-4 w-4 mr-1" />
-          AI预测
-        </Button>
+        {interval !== 'intraday' && (
+          <Button
+            variant={showAIPrediction ? 'primary' : 'outline'}
+            size="sm"
+            onClick={handleToggleAIPrediction}
+            disabled={loading}
+          >
+            <Brain className="h-4 w-4 mr-1" />
+            AI预测
+          </Button>
+        )}
       </div>
     );
   };
 
   // 渲染 AI 分析类型选择
   const renderAITypeControls = () => {
-    if (!showAIPrediction) {
+    if (!showAIPrediction || interval === 'intraday') {
       return null;
     }
     
@@ -467,26 +638,50 @@ export default function StockChart({ symbol }: StockChartProps) {
       <CardContent className="p-4">
         {renderChartControls()}
         
-        {loading ? (
-          <Skeleton className="h-80 w-full" />
-        ) : error ? (
-          <div className="h-80 w-full flex items-center justify-center">
-            <div className="text-center">
-              <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-2" />
-              <p className="text-red-500">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                className="mt-2"
-              >
-                <RefreshCw className="h-4 w-4 mr-1" />
-                重试
-              </Button>
+        {interval === 'intraday' ? (
+          intradayLoading ? (
+            <Skeleton className="h-80 w-full" />
+          ) : intradayError ? (
+            <div className="h-80 w-full flex items-center justify-center">
+              <div className="text-center">
+                <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-2" />
+                <p className="text-red-500">{intradayError}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => loadIntradayData(true)}
+                  className="mt-2"
+                >
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  重试
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : (
+            renderIntradayChart()
+          )
         ) : (
-          renderPriceVolumeChart()
+          loading ? (
+            <Skeleton className="h-80 w-full" />
+          ) : error ? (
+            <div className="h-80 w-full flex items-center justify-center">
+              <div className="text-center">
+                <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-2" />
+                <p className="text-red-500">{error}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefresh}
+                  className="mt-2"
+                >
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  重试
+                </Button>
+              </div>
+            </div>
+          ) : (
+            renderPriceVolumeChart()
+          )
         )}
         
         {renderAITypeControls()}

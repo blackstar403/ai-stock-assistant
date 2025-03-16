@@ -50,4 +50,9 @@ class DataSourceBase(ABC):
     @abstractmethod
     async def get_concept_distribution(self, symbol: str) -> Dict[str, Any]:
         """获取概念涨跌分布分析"""
+        pass
+        
+    @abstractmethod
+    async def get_intraday_data(self, symbol: str, refresh: bool = False) -> Dict[str, Any]:
+        """获取股票分时数据"""
         pass 
