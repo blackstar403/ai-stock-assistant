@@ -1527,7 +1527,6 @@ class AIService:
             
             # 调用LLM获取分析
             response = await openai_service.get_completion(prompt)
-            print(response)
             # 解析响应
             response_data = json.loads(response)
             trend = response_data.get("趋势", "neutral")
