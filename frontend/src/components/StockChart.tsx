@@ -17,7 +17,7 @@ import {
 } from 'recharts';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
-import { getStockPriceHistory, getAITimeSeriesAnalysis, getStockIntraday } from '../lib/api';
+import { getStockPriceHistory, getAITimeSeriesAnalysis, getStockIntraday, getAIIntradayAnalysis } from '../lib/api';
 import { StockPriceHistory } from '../types';
 import { RefreshCw, TrendingUp, BarChart2, Activity, AlertCircle, Brain, Clock } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
@@ -59,6 +59,9 @@ export default function StockChart({ symbol }: StockChartProps) {
   const [intradayData, setIntradayData] = useState<ChartDataPoint[]>([]);
   const [intradayLoading, setIntradayLoading] = useState(false);
   const [intradayError, setIntradayError] = useState<string | null>(null);
+  const [intradayAIAnalysis, setIntradayAIAnalysis] = useState<any>(null);
+  const [intradayAILoading, setIntradayAILoading] = useState(false);
+  const [intradayAIError, setIntradayAIError] = useState<string | null>(null);
 
   // 加载股票历史价格数据
   const loadPriceHistory = useCallback(async (forceRefresh: boolean = false) => {
@@ -184,6 +187,28 @@ export default function StockChart({ symbol }: StockChartProps) {
     }
   }, [symbol, interval, timeRange, analysisType]);
 
+  // 加载分时AI分析
+  const loadIntradayAIAnalysis = useCallback(async (forceRefresh: boolean = false) => {
+    if (!symbol) return;
+    
+    setIntradayAILoading(true);
+    setIntradayAIError(null);
+    
+    try {
+      const response = await getAIIntradayAnalysis(symbol, forceRefresh, analysisType);
+      if (response.success && response.data) {
+        setIntradayAIAnalysis(response.data);
+      } else {
+        setIntradayAIError(response.error || '加载分时AI分析失败');
+      }
+    } catch (err) {
+      console.error('加载分时AI分析出错:', err);
+      setIntradayAIError('加载分时AI分析时出错');
+    } finally {
+      setIntradayAILoading(false);
+    }
+  }, [symbol, analysisType]);
+
   // 初始加载和参数变化时重新加载
   useEffect(() => {
     if (interval === 'intraday') {
@@ -202,10 +227,20 @@ export default function StockChart({ symbol }: StockChartProps) {
     }
   }, [showAIPrediction, loadAIPrediction, interval]);
 
+  // 当显示 AI 预测且是分时图时加载分时AI分析
+  useEffect(() => {
+    if (showAIPrediction && interval === 'intraday') {
+      loadIntradayAIAnalysis();
+    }
+  }, [showAIPrediction, loadIntradayAIAnalysis, interval]);
+
   // 处理刷新
   const handleRefresh = () => {
     if (interval === 'intraday') {
       loadIntradayData(true);
+      if (showAIPrediction) {
+        loadIntradayAIAnalysis(true);
+      }
     } else {
       loadPriceHistory(true);
       if (showAIPrediction) {
@@ -216,8 +251,13 @@ export default function StockChart({ symbol }: StockChartProps) {
 
   // 处理切换 AI 预测
   const handleToggleAIPrediction = () => {
-    if (interval !== 'intraday') {
-      setShowAIPrediction(!showAIPrediction);
+    setShowAIPrediction(!showAIPrediction);
+    if (!showAIPrediction) {
+      if (interval === 'intraday') {
+        loadIntradayAIAnalysis();
+      } else {
+        loadAIPrediction();
+      }
     }
   };
 
@@ -408,6 +448,12 @@ export default function StockChart({ symbol }: StockChartProps) {
     }
 
     const colors = getChartColors();
+    
+    // 获取支撑位和阻力位
+    const supportLevels = showAIPrediction && intradayAIAnalysis && intradayAIAnalysis.support_levels 
+      ? intradayAIAnalysis.support_levels : [];
+    const resistanceLevels = showAIPrediction && intradayAIAnalysis && intradayAIAnalysis.resistance_levels 
+      ? intradayAIAnalysis.resistance_levels : [];
 
     return (
       <div className="h-80 w-full">
@@ -450,6 +496,38 @@ export default function StockChart({ symbol }: StockChartProps) {
               name="成交量"
               opacity={0.5}
             />
+            
+            {/* 支撑位 */}
+            {showAIPrediction && supportLevels.map((level: number, index: number) => (
+              <ReferenceLine
+                key={`support-${index}`}
+                y={level}
+                yAxisId="left"
+                stroke={colors.support}
+                strokeDasharray="3 3"
+                label={{
+                  value: `支撑: ${level.toFixed(2)}`,
+                  position: 'insideBottomRight',
+                  fill: colors.support,
+                }}
+              />
+            ))}
+            
+            {/* 阻力位 */}
+            {showAIPrediction && resistanceLevels.map((level: number, index: number) => (
+              <ReferenceLine
+                key={`resistance-${index}`}
+                y={level}
+                yAxisId="left"
+                stroke={colors.resistance}
+                strokeDasharray="3 3"
+                label={{
+                  value: `阻力: ${level.toFixed(2)}`,
+                  position: 'insideTopRight',
+                  fill: colors.resistance,
+                }}
+              />
+            ))}
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -458,11 +536,19 @@ export default function StockChart({ symbol }: StockChartProps) {
 
   // 渲染 AI 分析结果
   const renderAIAnalysis = () => {
-    if (!showAIPrediction || !aiPrediction || !aiPrediction.analysis) {
+    if (!showAIPrediction) {
       return null;
     }
     
-    const analysis = aiPrediction.analysis;
+    // 根据图表类型选择不同的分析数据
+    const analysis = interval === 'intraday' 
+      ? (intradayAIAnalysis && intradayAIAnalysis.analysis)
+      : (aiPrediction && aiPrediction.analysis);
+    
+    if (!analysis) {
+      return null;
+    }
+    
     const trend = analysis.trend;
     const strength = analysis.strength;
     
@@ -582,17 +668,15 @@ export default function StockChart({ symbol }: StockChartProps) {
           刷新
         </Button>
         
-        {interval !== 'intraday' && (
-          <Button
-            variant={showAIPrediction ? 'primary' : 'outline'}
-            size="sm"
-            onClick={handleToggleAIPrediction}
-            disabled={loading}
-          >
-            <Brain className="h-4 w-4 mr-1" />
-            AI预测
-          </Button>
-        )}
+        <Button
+          variant={showAIPrediction ? 'primary' : 'outline'}
+          size="sm"
+          onClick={handleToggleAIPrediction}
+          disabled={loading || intradayLoading}
+        >
+          <Brain className="h-4 w-4 mr-1" />
+          AI预测
+        </Button>
       </div>
     );
   };
@@ -686,17 +770,21 @@ export default function StockChart({ symbol }: StockChartProps) {
         
         {renderAITypeControls()}
         
-        {showAIPrediction && aiLoading && (
-          <Skeleton className="h-20 w-full mt-4" />
+        {showAIPrediction && (
+          (interval === 'intraday' ? intradayAILoading : aiLoading) && (
+            <Skeleton className="h-20 w-full mt-4" />
+          )
         )}
         
-        {showAIPrediction && aiError && (
-          <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-md">
-            <p className="text-sm flex items-center">
-              <AlertCircle className="h-4 w-4 mr-1" />
-              {aiError}
-            </p>
-          </div>
+        {showAIPrediction && (
+          (interval === 'intraday' ? intradayAIError : aiError) && (
+            <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-md">
+              <p className="text-sm flex items-center">
+                <AlertCircle className="h-4 w-4 mr-1" />
+                {interval === 'intraday' ? intradayAIError : aiError}
+              </p>
+            </div>
+          )
         )}
         
         {renderAIAnalysis()}

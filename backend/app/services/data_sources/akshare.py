@@ -807,8 +807,6 @@ class AKShareDataSource(DataSourceBase):
                 # 尝试不同的价格列名
                 price = None
                 volume = None
-
-                print(intraday_df.columns)
                 
                 # 价格列
                 if 'close' in intraday_df.columns:

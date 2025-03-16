@@ -38,4 +38,19 @@ async def analyze_time_series(
     if not analysis:
         return api_response(success=False, error="无法生成分时数据分析")
     
+    return api_response(data=analysis)
+
+@router.get("/intraday-analysis/{symbol}", response_model=dict)
+async def analyze_intraday(
+    symbol: str,
+    analysis_type: Optional[str] = Query("llm", description="分析类型: rule, ml, llm"),
+    data_source: Optional[str] = Query(None, description="数据源: alphavantage, tushare, akshare"),
+    db: Session = Depends(get_db)
+):
+    """获取股票分时数据的 AI 分析"""
+    analysis = await AIService.analyze_intraday(symbol, data_source, analysis_type)
+    
+    if not analysis:
+        return api_response(success=False, error="无法生成分时数据分析")
+    
     return api_response(data=analysis) 

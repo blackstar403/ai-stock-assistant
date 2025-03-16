@@ -638,4 +638,60 @@ export async function getStockIntraday(
       error: '获取分时数据时出错',
     };
   }
+}
+
+/**
+ * 获取AI分时分析
+ * @param symbol 股票代码
+ * @param forceRefresh 是否强制刷新缓存
+ * @param analysisType 分析类型：规则、机器学习或LLM
+ * @returns AI分时分析响应
+ */
+export async function getAIIntradayAnalysis(
+  symbol: string,
+  forceRefresh: boolean = false,
+  analysisType: 'rule' | 'ml' | 'llm' = 'llm'
+): Promise<ApiResponse<any>> {
+  const cacheKey = `getAIIntradayAnalysis:${symbol}:${analysisType}`;
+  
+  // 如果不是强制刷新，尝试从缓存获取
+  if (!forceRefresh) {
+    const cachedResult = await indexedDBCache.get<ApiResponse<any>>(cacheKey);
+    if (cachedResult) {
+      return cachedResult;
+    }
+  }
+  
+  try {
+    const params = new URLSearchParams();
+    params.append('analysis_type', analysisType);
+    
+    const response = await api.get<{success: boolean, data?: any, error?: string}>(
+      `/ai/intraday-analysis/${encodeURIComponent(symbol)}?${params.toString()}`
+    );
+    
+    // 直接返回后端的响应格式
+    if (response.data && 'success' in response.data) {
+      // 缓存结果（5分钟）
+      await indexedDBCache.set(cacheKey, response.data, 300 * 1000);
+      return response.data;
+    }
+    
+    // 如果响应不符合预期格式，进行转换
+    const result = {
+      success: true,
+      data: response.data as any
+    };
+    
+    // 缓存结果（5分钟）
+    await indexedDBCache.set(cacheKey, result, 300 * 1000);
+    
+    return result;
+  } catch (error) {
+    console.error('获取AI分时分析出错:', error);
+    return {
+      success: false,
+      error: '获取AI分时分析时出错',
+    };
+  }
 } 

@@ -851,4 +851,474 @@ class AIService:
         except Exception as e:
             print(f"Error in LLM time series analysis: {str(e)}")
             # 如果LLM分析失败，回退到规则分析
-            return await AIService._analyze_time_series_with_rule(historical_data, technical_indicators) 
+            return await AIService._analyze_time_series_with_rule(historical_data, technical_indicators)
+    
+    @staticmethod
+    async def analyze_intraday(
+        symbol: str,
+        data_source: str = None,
+        analysis_mode: str = None
+    ) -> Optional[Dict[str, Any]]:
+        """分析股票分时数据并生成 AI 分析"""
+        try:
+            # 如果未指定分析模式，使用默认模式
+            if analysis_mode is None:
+                analysis_mode = settings.DEFAULT_ANALYSIS_MODE
+            
+            # 验证分析模式
+            if analysis_mode not in AIService._analysis_modes:
+                analysis_mode = "llm"  # 默认使用 LLM 分析
+            
+            # 获取数据源
+            data_source_instance = DataSourceFactory.get_data_source(data_source)
+            
+            # 获取分时数据
+            intraday_data = await data_source_instance.get_intraday_data(symbol, refresh=False)
+            if not intraday_data or not intraday_data.get('data'):
+                return None
+            
+            # 获取股票基本信息
+            stock_info = await data_source_instance.get_stock_info(symbol)
+            if not stock_info:
+                return None
+            
+            # 转换分时数据为 DataFrame
+            df = pd.DataFrame(intraday_data['data'])
+            
+            # 计算技术指标
+            technical_indicators = AIService._calculate_intraday_indicators(df)
+            
+            # 根据分析模式选择分析方法
+            method_name = AIService._analysis_modes[analysis_mode]
+            method = getattr(AIService, f"_analyze_intraday_with_{analysis_mode}")
+            
+            # 执行分析
+            analysis_result = await method(
+                symbol=symbol,
+                stock_info=stock_info,
+                intraday_data=df,
+                technical_indicators=technical_indicators
+            )
+            
+            return {
+                "symbol": symbol,
+                "analysis": analysis_result,
+                "support_levels": AIService._calculate_support_levels(df),
+                "resistance_levels": AIService._calculate_resistance_levels(df)
+            }
+            
+        except Exception as e:
+            print(f"分析分时数据时出错: {str(e)}")
+            return None
+    
+    @staticmethod
+    def _calculate_intraday_indicators(df: pd.DataFrame) -> Dict[str, float]:
+        """计算分时数据的技术指标"""
+        try:
+            # 确保数据包含必要的列
+            if 'price' not in df.columns:
+                if 'close' in df.columns:
+                    df['price'] = df['close']
+                else:
+                    return {}
+            
+            # 计算移动平均线
+            df['ma5'] = df['price'].rolling(window=5).mean()
+            df['ma10'] = df['price'].rolling(window=10).mean()
+            df['ma20'] = df['price'].rolling(window=20).mean()
+            
+            # 计算成交量移动平均
+            if 'volume' in df.columns:
+                df['volume_ma5'] = df['volume'].rolling(window=5).mean()
+            
+            # 计算相对强弱指标 (RSI)
+            delta = df['price'].diff()
+            gain = delta.where(delta > 0, 0)
+            loss = -delta.where(delta < 0, 0)
+            avg_gain = gain.rolling(window=14).mean()
+            avg_loss = loss.rolling(window=14).mean()
+            rs = avg_gain / avg_loss
+            df['rsi'] = 100 - (100 / (1 + rs))
+            
+            # 计算布林带
+            df['middle_band'] = df['price'].rolling(window=20).mean()
+            df['std'] = df['price'].rolling(window=20).std()
+            df['upper_band'] = df['middle_band'] + (df['std'] * 2)
+            df['lower_band'] = df['middle_band'] - (df['std'] * 2)
+            
+            # 获取最新的指标值
+            latest = df.iloc[-1].to_dict()
+            
+            # 计算价格变化百分比
+            if len(df) > 1:
+                price_change = (df['price'].iloc[-1] - df['price'].iloc[0]) / df['price'].iloc[0] * 100
+            else:
+                price_change = 0
+                
+            # 计算成交量变化百分比
+            if 'volume' in df.columns and len(df) > 1:
+                volume_change = (df['volume'].iloc[-1] - df['volume'].iloc[0]) / df['volume'].iloc[0] * 100 if df['volume'].iloc[0] > 0 else 0
+            else:
+                volume_change = 0
+            
+            # 返回计算的指标
+            return {
+                'ma5': latest.get('ma5', 0),
+                'ma10': latest.get('ma10', 0),
+                'ma20': latest.get('ma20', 0),
+                'rsi': latest.get('rsi', 0),
+                'upper_band': latest.get('upper_band', 0),
+                'middle_band': latest.get('middle_band', 0),
+                'lower_band': latest.get('lower_band', 0),
+                'price_change_percent': price_change,
+                'volume_change_percent': volume_change,
+                'latest_price': latest.get('price', 0),
+                'latest_volume': latest.get('volume', 0) if 'volume' in latest else 0
+            }
+        except Exception as e:
+            print(f"计算分时技术指标时出错: {str(e)}")
+            return {}
+    
+    @staticmethod
+    def _calculate_support_levels(df: pd.DataFrame, num_levels: int = 3) -> List[float]:
+        """计算支撑位"""
+        try:
+            if 'price' not in df.columns and 'close' in df.columns:
+                df['price'] = df['close']
+                
+            if 'price' not in df.columns or len(df) < 20:
+                return []
+            
+            # 找到局部最低点
+            prices = df['price'].values
+            min_points = []
+            
+            for i in range(2, len(prices) - 2):
+                if (prices[i] < prices[i-1] and prices[i] < prices[i-2] and 
+                    prices[i] < prices[i+1] and prices[i] < prices[i+2]):
+                    min_points.append(prices[i])
+            
+            # 如果找不到足够的局部最低点，使用简单方法
+            if len(min_points) < num_levels:
+                min_price = df['price'].min()
+                current_price = df['price'].iloc[-1]
+                
+                # 在最低价和当前价之间生成支撑位
+                if current_price > min_price:
+                    step = (current_price - min_price) / (num_levels + 1)
+                    return [min_price + step * i for i in range(1, num_levels + 1)]
+                else:
+                    # 如果当前价是最低价，生成略低于当前价的支撑位
+                    return [current_price * (1 - 0.01 * i) for i in range(1, num_levels + 1)]
+            
+            # 对局部最低点排序并选择最接近当前价格的几个
+            current_price = df['price'].iloc[-1]
+            min_points.sort(reverse=True)  # 从高到低排序
+            
+            # 选择低于当前价格的支撑位
+            support_levels = [p for p in min_points if p < current_price]
+            
+            # 如果没有足够的支撑位，添加一些基于百分比的支撑位
+            while len(support_levels) < num_levels:
+                next_level = current_price * (1 - 0.01 * (len(support_levels) + 1))
+                support_levels.append(next_level)
+            
+            return sorted(support_levels[:num_levels], reverse=True)
+        except Exception as e:
+            print(f"计算支撑位时出错: {str(e)}")
+            return []
+    
+    @staticmethod
+    def _calculate_resistance_levels(df: pd.DataFrame, num_levels: int = 3) -> List[float]:
+        """计算阻力位"""
+        try:
+            if 'price' not in df.columns and 'close' in df.columns:
+                df['price'] = df['close']
+                
+            if 'price' not in df.columns or len(df) < 20:
+                return []
+            
+            # 找到局部最高点
+            prices = df['price'].values
+            max_points = []
+            
+            for i in range(2, len(prices) - 2):
+                if (prices[i] > prices[i-1] and prices[i] > prices[i-2] and 
+                    prices[i] > prices[i+1] and prices[i] > prices[i+2]):
+                    max_points.append(prices[i])
+            
+            # 如果找不到足够的局部最高点，使用简单方法
+            if len(max_points) < num_levels:
+                max_price = df['price'].max()
+                current_price = df['price'].iloc[-1]
+                
+                # 在最高价和当前价之间生成阻力位
+                if current_price < max_price:
+                    step = (max_price - current_price) / (num_levels + 1)
+                    return [current_price + step * i for i in range(1, num_levels + 1)]
+                else:
+                    # 如果当前价是最高价，生成略高于当前价的阻力位
+                    return [current_price * (1 + 0.01 * i) for i in range(1, num_levels + 1)]
+            
+            # 对局部最高点排序并选择最接近当前价格的几个
+            current_price = df['price'].iloc[-1]
+            max_points.sort()  # 从低到高排序
+            
+            # 选择高于当前价格的阻力位
+            resistance_levels = [p for p in max_points if p > current_price]
+            
+            # 如果没有足够的阻力位，添加一些基于百分比的阻力位
+            while len(resistance_levels) < num_levels:
+                next_level = current_price * (1 + 0.01 * (len(resistance_levels) + 1))
+                resistance_levels.append(next_level)
+            
+            return sorted(resistance_levels[:num_levels])
+        except Exception as e:
+            print(f"计算阻力位时出错: {str(e)}")
+            return []
+    
+    @staticmethod
+    async def _analyze_intraday_with_rule(
+        symbol: str,
+        stock_info: Dict[str, Any],
+        intraday_data: pd.DataFrame,
+        technical_indicators: Dict[str, float]
+    ) -> Dict[str, Any]:
+        """使用规则分析分时数据"""
+        try:
+            # 获取技术指标
+            rsi = technical_indicators.get('rsi', 50)
+            price_change = technical_indicators.get('price_change_percent', 0)
+            volume_change = technical_indicators.get('volume_change_percent', 0)
+            latest_price = technical_indicators.get('latest_price', 0)
+            ma5 = technical_indicators.get('ma5', 0)
+            ma10 = technical_indicators.get('ma10', 0)
+            ma20 = technical_indicators.get('ma20', 0)
+            upper_band = technical_indicators.get('upper_band', 0)
+            lower_band = technical_indicators.get('lower_band', 0)
+            
+            # 确定趋势
+            trend = "neutral"
+            if price_change > 1.5:
+                trend = "bullish"
+            elif price_change < -1.5:
+                trend = "bearish"
+            
+            # 确定强度
+            strength = "medium"
+            if abs(price_change) > 3:
+                strength = "strong"
+            elif abs(price_change) < 1:
+                strength = "weak"
+            
+            # 生成分析摘要
+            summary = ""
+            if trend == "bullish":
+                if latest_price > upper_band:
+                    summary = f"{stock_info.name}分时走势强劲上涨，价格突破布林带上轨，可能出现超买。"
+                elif latest_price > ma5 and ma5 > ma10:
+                    summary = f"{stock_info.name}分时走势向上，短期均线上穿中期均线，呈现多头排列。"
+                else:
+                    summary = f"{stock_info.name}分时走势偏强，价格上涨{price_change:.2f}%。"
+            elif trend == "bearish":
+                if latest_price < lower_band:
+                    summary = f"{stock_info.name}分时走势明显下跌，价格跌破布林带下轨，可能出现超卖。"
+                elif latest_price < ma5 and ma5 < ma10:
+                    summary = f"{stock_info.name}分时走势向下，短期均线下穿中期均线，呈现空头排列。"
+                else:
+                    summary = f"{stock_info.name}分时走势偏弱，价格下跌{abs(price_change):.2f}%。"
+            else:
+                summary = f"{stock_info.name}分时走势震荡，价格变化不大，处于盘整阶段。"
+            
+            # 添加成交量分析
+            if volume_change > 20:
+                summary += f" 成交量明显放大，增加{volume_change:.2f}%，交投活跃。"
+            elif volume_change < -20:
+                summary += f" 成交量明显萎缩，减少{abs(volume_change):.2f}%，交投清淡。"
+            
+            # 添加RSI分析
+            if rsi > 70:
+                summary += f" RSI为{rsi:.2f}，处于超买区域，可能面临回调。"
+            elif rsi < 30:
+                summary += f" RSI为{rsi:.2f}，处于超卖区域，可能出现反弹。"
+            
+            return {
+                "trend": trend,
+                "strength": strength,
+                "summary": summary
+            }
+        except Exception as e:
+            print(f"规则分析分时数据时出错: {str(e)}")
+            return {
+                "trend": "neutral",
+                "strength": "medium",
+                "summary": f"{stock_info.get('name', symbol)}分时数据分析失败。"
+            }
+    
+    @staticmethod
+    async def _analyze_intraday_with_ml(
+        symbol: str,
+        stock_info: Dict[str, Any],
+        intraday_data: pd.DataFrame,
+        technical_indicators: Dict[str, float]
+    ) -> Dict[str, Any]:
+        """使用机器学习分析分时数据"""
+        try:
+            # 获取ML服务实例
+            ml_service = AIService.get_ml_service()
+            
+            # 准备特征数据
+            features = pd.DataFrame([technical_indicators])
+            
+            # 使用ML模型预测趋势
+            trend_proba = ml_service.predict_trend_probability(features)
+            
+            # 确定趋势和强度
+            if trend_proba > 0.6:
+                trend = "bullish"
+                strength = "strong" if trend_proba > 0.8 else "medium"
+            elif trend_proba < 0.4:
+                trend = "bearish"
+                strength = "strong" if trend_proba < 0.2 else "medium"
+            else:
+                trend = "neutral"
+                strength = "medium"
+            
+            # 生成分析摘要
+            price_change = technical_indicators.get('price_change_percent', 0)
+            volume_change = technical_indicators.get('volume_change_percent', 0)
+            
+            summary = f"{stock_info.get('name', symbol)}分时数据机器学习分析显示，"
+            
+            if trend == "bullish":
+                summary += f"股价走势偏强，上涨概率为{trend_proba*100:.2f}%。"
+                if price_change > 0:
+                    summary += f" 当前价格已上涨{price_change:.2f}%。"
+            elif trend == "bearish":
+                summary += f"股价走势偏弱，下跌概率为{(1-trend_proba)*100:.2f}%。"
+                if price_change < 0:
+                    summary += f" 当前价格已下跌{abs(price_change):.2f}%。"
+            else:
+                summary += "股价走势中性，处于盘整阶段。"
+            
+            # 添加成交量分析
+            if volume_change > 20:
+                summary += f" 成交量明显放大，增加{volume_change:.2f}%，交投活跃。"
+            elif volume_change < -20:
+                summary += f" 成交量明显萎缩，减少{abs(volume_change):.2f}%，交投清淡。"
+            
+            return {
+                "trend": trend,
+                "strength": strength,
+                "summary": summary,
+                "trend_probability": trend_proba
+            }
+        except Exception as e:
+            print(f"机器学习分析分时数据时出错: {str(e)}")
+            return {
+                "trend": "neutral",
+                "strength": "medium",
+                "summary": f"{stock_info.get('name', symbol)}分时数据机器学习分析失败。"
+            }
+    
+    @staticmethod
+    async def _analyze_intraday_with_llm(
+        symbol: str,
+        stock_info: Dict[str, Any],
+        intraday_data: pd.DataFrame,
+        technical_indicators: Dict[str, float]
+    ) -> Dict[str, Any]:
+        """使用大语言模型分析分时数据"""
+        try:
+            # 获取OpenAI服务实例
+            openai_service = AIService.get_openai_service()
+            
+            # 将 stock_info 转换为字典
+            if not isinstance(stock_info, dict):
+                print("--------------------33------------")
+                print(stock_info)
+                print("--------------------------------")   
+                try:
+                    # 如果是可转换为字典的对象（如ORM模型），尝试转换
+                    stock_info = dict(stock_info)
+                except (TypeError, ValueError):
+                    # 如果无法转换，创建一个只包含股票代码的新字典
+                    stock_info = {"symbol": symbol}
+
+            # 准备提示信息
+            stock_name = stock_info.get('name', symbol)
+            price_change = technical_indicators.get('price_change_percent', 0)
+            volume_change = technical_indicators.get('volume_change_percent', 0)
+            rsi = technical_indicators.get('rsi', 50)
+            latest_price = technical_indicators.get('latest_price', 0)
+            
+            # 获取最近的价格数据点
+            recent_prices = intraday_data['price'].tail(10).tolist() if 'price' in intraday_data.columns else []
+            if not recent_prices and 'close' in intraday_data.columns:
+                recent_prices = intraday_data['close'].tail(10).tolist()
+            
+            # 构建提示
+            prompt = f"""
+            分析以下股票的分时数据，并给出趋势判断和分析摘要：
+            
+            股票代码: {symbol}
+            股票名称: {stock_name}
+            最新价格: {latest_price}
+            价格变化百分比: {price_change:.2f}%
+            成交量变化百分比: {volume_change:.2f}%
+            RSI指标: {rsi:.2f}
+            
+            最近10个价格点: {recent_prices}
+            
+            技术指标:
+            - MA5: {technical_indicators.get('ma5', 0):.2f}
+            - MA10: {technical_indicators.get('ma10', 0):.2f}
+            - MA20: {technical_indicators.get('ma20', 0):.2f}
+            - 上轨: {technical_indicators.get('upper_band', 0):.2f}
+            - 中轨: {technical_indicators.get('middle_band', 0):.2f}
+            - 下轨: {technical_indicators.get('lower_band', 0):.2f}
+            
+            请提供以下格式的分析:
+            1. 趋势: [bullish/bearish/neutral]
+            2. 强度: [strong/medium/weak]
+            3. 分析摘要: [100-150字的分析，包括价格走势、成交量变化、技术指标分析等]
+            """
+            
+            # 调用LLM获取分析
+            response = await openai_service.get_completion(prompt)
+            
+            # 解析响应
+            trend = "neutral"
+            strength = "medium"
+            summary = ""
+            
+            if "趋势: bullish" in response.lower() or "趋势：bullish" in response.lower():
+                trend = "bullish"
+            elif "趋势: bearish" in response.lower() or "趋势：bearish" in response.lower():
+                trend = "bearish"
+            
+            if "强度: strong" in response.lower() or "强度：strong" in response.lower():
+                strength = "strong"
+            elif "强度: weak" in response.lower() or "强度：weak" in response.lower():
+                strength = "weak"
+            
+            # 提取摘要
+            summary_start = response.find("分析摘要:") if "分析摘要:" in response else response.find("分析摘要：")
+            if summary_start != -1:
+                summary = response[summary_start + 5:].strip()
+            else:
+                # 如果找不到摘要标记，使用整个响应
+                summary = response.strip()
+            
+            return {
+                "trend": trend,
+                "strength": strength,
+                "summary": summary
+            }
+        except Exception as e:
+            print(f"LLM分析分时数据时出错: {str(e)}")
+            return {
+                "trend": "neutral",
+                "strength": "medium",
+                "summary": f"{stock_info.get('name', symbol)}分时数据LLM分析失败。"
+            } 
