@@ -16,7 +16,10 @@ class OpenAIService:
     
     def __init__(self):
         """初始化 OpenAI 客户端"""
-        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        self.client = AsyncOpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.OPENAI_API_BASE
+        )
         self.model = settings.OPENAI_MODEL
         self.max_tokens = settings.OPENAI_MAX_TOKENS
         self.temperature = settings.OPENAI_TEMPERATURE
@@ -38,10 +41,15 @@ class OpenAIService:
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=self.max_tokens,
-                temperature=self.temperature
+                temperature=self.temperature,
+                response_format={"type": "json_object"}
             )
             
-            return response.choices[0].message.content
+            # 解析响应
+            content = response.choices[0].message.content
+            if not content:
+                content = response.choices[0].message.reasoning_content
+            return content
         except Exception as e:
             print(f"OpenAI API 调用出错: {str(e)}")
             return ""

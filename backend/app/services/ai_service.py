@@ -3,6 +3,7 @@ import pandas as pd
 from typing import Dict, Any, List, Optional
 import random
 import re
+import json
 
 from app.core.config import settings
 from app.schemas.stock import AIAnalysis
@@ -1518,33 +1519,33 @@ class AIService:
             1. 趋势: [bullish/bearish/neutral]
             2. 强度: [strong/medium/weak]
             3. 分析摘要: [100-150字的分析，包括价格走势、成交量变化、技术指标分析等]
+
+            请确保返回的是有效的JSON格式。
             """
             
             # 调用LLM获取分析
             response = await openai_service.get_completion(prompt)
             
             # 解析响应
-            trend = "neutral"
-            strength = "medium"
-            summary = ""
+            response_data = json.loads(response)
+            trend = response_data.get("趋势", "neutral")
+            strength = response_data.get("强度", "medium")
+            summary = response_data.get("分析摘要", "")
             
-            if "趋势: bullish" in response.lower() or "趋势：bullish" in response.lower():
+            # 标准化趋势和强度值
+            if trend.lower() == "bullish":
                 trend = "bullish"
-            elif "趋势: bearish" in response.lower() or "趋势：bearish" in response.lower():
+            elif trend.lower() == "bearish":
                 trend = "bearish"
-            
-            if "强度: strong" in response.lower() or "强度：strong" in response.lower():
-                strength = "strong"
-            elif "强度: weak" in response.lower() or "强度：weak" in response.lower():
-                strength = "weak"
-            
-            # 提取摘要
-            summary_match = re.search(r'分析摘要:(.*?)(?:\n|$)', response, re.DOTALL | re.IGNORECASE)
-            if summary_match:
-                summary = summary_match.group(1).strip()
             else:
-                # 如果没有找到格式化的摘要，使用整个响应
-                summary = response.strip()
+                trend = "neutral"
+                
+            if strength.lower() == "strong":
+                strength = "strong"
+            elif strength.lower() == "weak":
+                strength = "weak"
+            else:
+                strength = "medium"
             
             # 计算AI分时高低信号
             intraday_high_signal = None
