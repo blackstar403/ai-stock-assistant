@@ -1490,13 +1490,12 @@ class AIService:
             latest_price = technical_indicators.get('latest_price', 0)
             
             # 获取最近的价格数据点
-            recent_prices = intraday_data['price'].tail(10).tolist() if 'price' in intraday_data.columns else []
-            if not recent_prices and 'close' in intraday_data.columns:
-                recent_prices = intraday_data['close'].tail(10).tolist()
+            # Convert DataFrame to List
+            intraday_data_json = intraday_data.to_dict(orient='records')
             
             # 构建提示
             prompt = f"""
-            分析以下股票的分时数据，并给出趋势判断和分析摘要：
+            分析以下股票当天的分时数据，并给出趋势判断和分析摘要：
             
             股票代码: {symbol}
             股票名称: {stock_name}
@@ -1505,7 +1504,7 @@ class AIService:
             成交量变化百分比: {volume_change:.2f}%
             RSI指标: {rsi:.2f}
             
-            最近10个价格点: {recent_prices}
+            当天分时数据: {intraday_data_json}
             
             技术指标:
             - MA5: {technical_indicators.get('ma5', 0):.2f}
@@ -1519,18 +1518,23 @@ class AIService:
             1. 趋势: [bullish/bearish/neutral]
             2. 强度: [strong/medium/weak]
             3. 分析摘要: [100-150字的分析，包括价格走势、成交量变化、技术指标分析等]
+            4. 高低信号: [high/medium/low]
+            5. intraday_high_signal: price, confidence, time
+            6. intraday_low_signal: price, confidence, time 
 
             请确保返回的是有效的JSON格式。
             """
             
             # 调用LLM获取分析
             response = await openai_service.get_completion(prompt)
-            
+            print(response)
             # 解析响应
             response_data = json.loads(response)
             trend = response_data.get("趋势", "neutral")
             strength = response_data.get("强度", "medium")
             summary = response_data.get("分析摘要", "")
+            intraday_high_signal = response_data.get("intraday_high_signal", None)
+            intraday_low_signal = response_data.get("intraday_low_signal", None)
             
             # 标准化趋势和强度值
             if trend.lower() == "bullish":
@@ -1546,38 +1550,6 @@ class AIService:
                 strength = "weak"
             else:
                 strength = "medium"
-            
-            # 计算AI分时高低信号
-            intraday_high_signal = None
-            intraday_low_signal = None
-            
-            # 如果有足够的数据点
-            if len(intraday_data) >= 30:
-                # 获取最近的价格数据
-                recent_data = intraday_data.tail(30)
-                
-                # 计算当前价格与近期高点和低点的关系
-                recent_high = recent_data['price'].max() if 'price' in recent_data.columns else 0
-                recent_low = recent_data['price'].min() if 'price' in recent_data.columns else 0
-                
-                # 计算价格波动范围
-                price_range = recent_high - recent_low
-                
-                # 如果价格接近近期高点（距离小于波动范围的10%）
-                if price_range > 0 and (recent_high - latest_price) < price_range * 0.1:
-                    intraday_high_signal = {
-                        "price": round(float(recent_high), 2),
-                        "confidence": "high" if rsi > 70 else "medium",
-                        "time": str(recent_data.iloc[recent_data['price'].argmax()]['time']) if 'price' in recent_data.columns and 'time' in recent_data.columns else None
-                    }
-                
-                # 如果价格接近近期低点（距离小于波动范围的10%）
-                if price_range > 0 and (latest_price - recent_low) < price_range * 0.1:
-                    intraday_low_signal = {
-                        "price": round(float(recent_low), 2),
-                        "confidence": "high" if rsi < 30 else "medium",
-                        "time": str(recent_data.iloc[recent_data['price'].argmin()]['time']) if 'price' in recent_data.columns and 'time' in recent_data.columns else None
-                    }
             
             return {
                 "trend": trend,
