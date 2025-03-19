@@ -20,13 +20,9 @@
 **重要提示：使用本项目前，请确认您已经明白以下事实**
 
 1. **这不是一个印钞机**：本项目不能保证让你成为下一个巴菲特或西蒙斯。如果有这种功能，我们早就退休去马尔代夫了。
-
 2. **市场风险**：股市有风险，入市需谨慎。记住，市场永远是对的，即使它看起来不讲道理。
-
 3. **AI也会犯错**：我们的AI模型虽然聪明，但它不会预测地震、政变或者你邻居突然决定抛售所有股票。
-
 4. **用户责任**：如果你在使用本软件后亏钱了，请记住是你自己点的"买入"按钮，不是我们。
-
 5. **数据来源**：我们使用的数据来自第三方，如果数据出错，那真的不是我们的锅。
 
 **使用本项目即表示您同意：无论盈亏，都保持微笑，因为至少你学到了宝贵的经验。**
@@ -67,17 +63,21 @@
 #### 部署步骤
 
 1. 克隆仓库
+
 ```bash
 git clone https://github.com/x-pai/ai-stock-assistant.git
 cd ai-stock-assistant
 ```
 
 2. 运行部署脚本
+
 ```bash
-./deploy.sh
+linux ./deploy.sh
+window 在当前目录下打开powershell 执行.\deploy.ps1
 ```
 
-3. 访问应用
+4. 访问应用
+
 - 后端 API 文档：http://localhost:8000/api/v1/docs
 - 前端界面：http://localhost:3000
 
@@ -114,11 +114,13 @@ npm start
 ## 🤝 加入我们的"理性交易者"社区
 
 公众号：
+
 <div align="center">
   <img src="./materials/mp_weixin_qr.png" alt="AlphaBot公众号" width="300"/>
 </div>
 
 微信群：
+
 <div align="center">
   <img src="./materials/wechat_group_qr.jpg" alt="AlphaBot微信群" width="300"/>
 </div>
